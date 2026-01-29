@@ -323,6 +323,7 @@ function initializeElements() {
         elements.modalEditBtn = document.getElementById('modal-edit-btn');
         elements.modalSaveBtn = document.getElementById('modal-save-btn');
         elements.modalCancelBtn = document.getElementById('modal-cancel-btn');
+        elements.modalThanksBtn = document.getElementById('modal-thanks-btn');
     }
 
     elements.toast = document.getElementById('toast');
@@ -443,7 +444,10 @@ function renderFollowingList() {
                     <span class="user-name user-link" onclick="showUserProfile('${user.userId}')">${escapeHtml(user.name)}</span>
                     <span class="user-id">@${escapeHtml(user.userId)}</span>
                 </div>
-                <button class="follow-btn following" onclick="toggleFollow('${user.userId}')">フォロー中</button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="follow-btn following" onclick="toggleFollow('${user.userId}')">フォロー中</button>
+                    <button class="btn-sm btn-success" style="border-radius: 50px;" onclick="openSendTabWithRecipient('${user.userId}')">ありがとう</button>
+                </div>
             </div>
         `).join('');
     }
@@ -478,6 +482,25 @@ window.toggleFollow = function (targetUserId) {
     renderFollowingList();
     renderBlockedList();
     updateRecipientOptions(); // 宛先リストも更新
+};
+
+window.openSendTabWithRecipient = function (userId) {
+    const user = findUser(userId);
+    if (!user) return;
+
+    // モーダルが開いていれば閉じる
+    if (elements.profileModal.classList.contains('show')) {
+        closeModal();
+    }
+
+    // 送るタブに切り替え
+    switchTab('send');
+
+    // 宛先を選択
+    elements.recipientSelect.value = userId;
+
+    // フォームにスクロール
+    elements.sendForm.scrollIntoView({ behavior: 'smooth' });
 };
 
 function renderBlockedList() {
@@ -551,12 +574,14 @@ window.showUserProfile = function (userId) {
     // ボタン制御
     if (isMe) {
         elements.modalActionBtn.classList.add('hidden');
+        elements.modalThanksBtn.classList.add('hidden');
         elements.modalBlockBtn.classList.add('hidden');
         elements.modalEditBtn.classList.remove('hidden');
         elements.modalSaveBtn.classList.add('hidden');
         elements.modalCancelBtn.classList.add('hidden');
     } else {
         elements.modalActionBtn.classList.remove('hidden');
+        elements.modalThanksBtn.classList.remove('hidden');
         elements.modalBlockBtn.classList.remove('hidden');
         elements.modalEditBtn.classList.add('hidden');
         elements.modalSaveBtn.classList.add('hidden');
@@ -569,7 +594,12 @@ window.showUserProfile = function (userId) {
         // replaceButtonListenerで毎回新しくなるのでOK
     }
 
-    // ボタンのイベントリスナー再設定（クローンして置換することで重複防止）
+    // Thanks Button Listener
+    replaceButtonListener(elements.modalThanksBtn, () => {
+        openSendTabWithRecipient(user.userId);
+    });
+
+    // Block button listener
     replaceButtonListener(elements.modalActionBtn, () => {
         window.toggleFollow(user.userId);
         updateFollowButton(user.userId);
@@ -582,11 +612,8 @@ window.showUserProfile = function (userId) {
             renderSearchResult(user);
         }
         renderFollowingList();
-        renderFollowingList();
         renderBlockedList();
     });
-
-    // Block button listener
     replaceButtonListener(elements.modalBlockBtn, () => {
         if (isBlocked(user.userId)) {
             unblockUser(user.userId);
@@ -697,6 +724,7 @@ function replaceButtonListener(element, callback) {
     // 参照を更新
     if (newElement.id === 'modal-action-btn') elements.modalActionBtn = newElement;
     if (newElement.id === 'modal-block-btn') elements.modalBlockBtn = newElement;
+    if (newElement.id === 'modal-thanks-btn') elements.modalThanksBtn = newElement;
 }
 
 // プロフィール編集モード
@@ -1115,7 +1143,9 @@ function initialize() {
         });
         elements.modalEditBtn.addEventListener('click', enableEditProfile);
         elements.modalSaveBtn.addEventListener('click', saveProfile);
+        elements.modalSaveBtn.addEventListener('click', saveProfile);
         elements.modalCancelBtn.addEventListener('click', cancelEditProfile);
+
 
         // Avatar Upload Events
         elements.avatarEditOverlay.addEventListener('click', () => {
