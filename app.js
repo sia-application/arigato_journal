@@ -294,6 +294,9 @@ function initializeElements() {
         elements.messageInput = document.getElementById('message');
         elements.receivedMessages = document.getElementById('received-messages');
         elements.sentMessages = document.getElementById('sent-messages');
+        elements.receivedMessages = document.getElementById('received-messages');
+        elements.sentMessages = document.getElementById('sent-messages');
+        elements.timelineList = document.getElementById('timeline-list');
         elements.receivedBadge = document.getElementById('received-badge');
 
         // Search & Friends
@@ -445,7 +448,7 @@ function renderFollowingList() {
                     <span class="user-id">@${escapeHtml(user.userId)}</span>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
-                    <button class="btn-sm btn-success" style="border-radius: 50px;" onclick="openSendTabWithRecipient('${user.userId}')">ありがとう</button>
+                    <button class="btn-sm btn-success" style="border-radius: 50px;" onclick="openSendTabWithRecipient('${user.userId}')">ありがとうを送る</button>
                     <button class="follow-btn following" onclick="toggleFollow('${user.userId}')">フォロー中</button>
                 </div>
             </div>
