@@ -940,25 +940,15 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-function formatDate(date) {
-    const now = new Date();
-    const diff = now - date;
+function formatDate(dateInput) {
+    const date = new Date(dateInput);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
 
-    if (diff < 60000) { // 1分未満
-        return 'たった今';
-    } else if (diff < 3600000) { // 1時間未満
-        return Math.floor(diff / 60000) + '分前';
-    } else if (diff < 86400000) { // 24時間未満
-        return Math.floor(diff / 3600000) + '時間前';
-    } else if (diff < 604800000) { // 1週間未満
-        return Math.floor(diff / 86400000) + '日前';
-    } else {
-        return date.toLocaleDateString('ja-JP', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    }
+    return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
 }
 
 // ============================

@@ -1038,23 +1038,57 @@ body::after {
     }
 }
 
+/* Blocked Action (Disabled Follow) */
+.blocked-action {
+    background: var(--gray-200) !important;
+    color: var(--text-light) !important;
+    border: 1px solid var(--gray-300) !important;
+    cursor: not-allowed !important;
+}
+
 /* Blocked Button Styles */
 .btn-blocked {
-    background: #ef4444 !important;
-    color: white !important;
-    border: 1px solid #ef4444 !important;
+    background: #ef4444;
+    /* Changed from !important to standard cascade if possible, but keeping for safety if needed */
+    color: white;
+    border: 1px solid #ef4444;
 }
 
 .btn-blocked:hover {
-    background: #dc2626 !important;
+    background: #dc2626;
     opacity: 0.9;
 }
 
 .follow-btn.blocked {
-    background: #ef4444 !important;
-    color: white !important;
-    border: 1px solid #ef4444 !important;
-    cursor: pointer !important;
+    background: #ef4444;
+    color: white;
+    border: 1px solid #ef4444;
+    cursor: pointer;
+}
+
+/* Following Button Style (Default/List - Filled) */
+.follow-btn.following {
+    background: var(--pink-100);
+    color: var(--pink-600);
+    border: 1px solid transparent;
+}
+
+.follow-btn.following:hover {
+    background: var(--pink-200);
+    color: var(--pink-700);
+}
+
+/* Modal Specific Following Button (Outline - Nice) */
+#modal-action-btn.following {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--gray-400);
+}
+
+#modal-action-btn.following:hover {
+    border-color: var(--gray-600);
+    color: var(--text-primary);
+    background: var(--gray-100);
 }
 
 /* Edit Profile Styles */
