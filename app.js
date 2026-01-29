@@ -1187,7 +1187,7 @@ function createMessageCard(msg, type = 'sent', latestTime = null, hasUnread = nu
     // 返信ボタン
     let actionsHtml = '';
 
-    if (type !== 'received' && type !== 'thread') {
+    if (type === 'timeline') {
         toHtml = `
             <span class="message-arrow">→</span>
             <span class="message-to user-link" onclick="showUserProfile('${escapeHtml(msg.toId)}')">${escapeHtml(msg.toName)}</span>
