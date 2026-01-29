@@ -1194,6 +1194,11 @@ function createMessageCard(msg, type = 'sent', latestTime = null, hasUnread = nu
          `;
     }
 
+    // Unread styling
+    const showUnread = hasUnread !== null ? hasUnread : (type === 'received' && !msg.isRead);
+    const unreadClass = showUnread ? 'unread' : '';
+    const unreadBadge = showUnread ? '<span class="unread-badge">NEW</span>' : '';
+
     // 自分のメッセージ以外で、かつタイムラインか受信ボックスの場合に返信ボタンを表示
     if (type !== 'thread') {
         if (!isOwnMessage) {
@@ -1201,6 +1206,7 @@ function createMessageCard(msg, type = 'sent', latestTime = null, hasUnread = nu
                 <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
                     💬 スレッド
                 </button>
+                ${unreadBadge}
             `;
         } else {
             actionsHtml = `
@@ -1208,6 +1214,7 @@ function createMessageCard(msg, type = 'sent', latestTime = null, hasUnread = nu
                     <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
                         💬 スレッド
                     </button>
+                    ${unreadBadge}
                     <button class="delete-btn" title="削除" onclick="deleteMessage('${escapeHtml(msg.id)}')">
                         🗑️
                     </button>
@@ -1236,11 +1243,6 @@ function createMessageCard(msg, type = 'sent', latestTime = null, hasUnread = nu
         `;
     }
 
-    // Unread styling
-    const showUnread = hasUnread !== null ? hasUnread : (type === 'received' && !msg.isRead);
-    const unreadClass = showUnread ? 'unread' : '';
-    const unreadBadge = showUnread ? '<span class="unread-badge">NEW</span>' : '';
-
     // 最新アクティビティ表示
     let latestActivityHtml = '';
     if (latestTime && type !== 'thread') {
@@ -1252,7 +1254,6 @@ function createMessageCard(msg, type = 'sent', latestTime = null, hasUnread = nu
             <div class="message-header">
                 <div class="message-users">
                     <span class="message-from user-link" onclick="showUserProfile('${escapeHtml(msg.fromId)}')">${escapeHtml(msg.fromName)}</span>
-                    ${unreadBadge}
                     ${toHtml}
                     ${actionsHtml}
                 </div>
