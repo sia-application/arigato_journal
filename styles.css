@@ -1022,3 +1022,22 @@ body::after {
         padding: 18px;
     }
 }
+
+/* Blocked Button Styles */
+.btn-blocked {
+    background: #ef4444 !important;
+    color: white !important;
+    border: 1px solid #ef4444 !important;
+}
+
+.btn-blocked:hover {
+    background: #dc2626 !important;
+    opacity: 0.9;
+}
+
+.follow-btn.blocked {
+    background: #ef4444 !important;
+    color: white !important;
+    border: 1px solid #ef4444 !important;
+    cursor: default;
+}

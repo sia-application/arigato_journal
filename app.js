@@ -76,6 +76,7 @@ function createUser(userId, name, password) {
         bio: '', // 自己紹介
         avatar: '👤', // プロフィール画像
         following: [], // フォローリスト
+        blocked: [], // ブロックリスト
         createdAt: Date.now()
     };
     users.push(newUser);
@@ -125,7 +126,11 @@ function sendMessage(toId, toName, message) {
 }
 
 function getReceivedMessages(userId) {
-    return getMessages().filter(m => m.toId === userId);
+    const currentUser = getCurrentUser();
+    const blocked = currentUser && currentUser.blocked ? currentUser.blocked : [];
+    return getMessages()
+        .filter(m => m.toId === userId)
+        .filter(m => !blocked.includes(m.fromId));
 }
 
 // フォロー機能
@@ -177,6 +182,69 @@ function getFollowerCount(userId) {
 function getFollowingCount(userId) {
     const user = findUser(userId);
     return user && user.following ? user.following.length : 0;
+}
+
+// ブロック機能
+function blockUser(targetUserId) {
+    const users = getUsers(); // 全ユーザーデータを一度取得
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    // 配列内の自分の参照を取得
+    const myIndex = users.findIndex(u => u.userId === currentUser.userId);
+    if (myIndex === -1) return;
+    const me = users[myIndex];
+
+    if (!me.blocked) me.blocked = [];
+
+    // まだブロックしていない場合のみ実行
+    if (!me.blocked.includes(targetUserId)) {
+        me.blocked.push(targetUserId);
+
+        // 1. 自分が相手をフォローしていたら解除
+        if (me.following && me.following.includes(targetUserId)) {
+            me.following = me.following.filter(id => id !== targetUserId);
+        }
+
+        // 2. 相手が自分をフォローしていたら解除 (強制フォロー解除)
+        const targetIndex = users.findIndex(u => u.userId === targetUserId);
+        if (targetIndex !== -1) {
+            const target = users[targetIndex];
+            if (target.following && target.following.includes(me.userId)) {
+                target.following = target.following.filter(id => id !== me.userId);
+            }
+        }
+
+        // 一括保存
+        saveUsers(users);
+        setCurrentUser(me); // 自身のセッション情報も更新
+    }
+}
+
+function unblockUser(targetUserId) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    if (currentUser.blocked && currentUser.blocked.includes(targetUserId)) {
+        currentUser.blocked = currentUser.blocked.filter(id => id !== targetUserId);
+        updateUserInStorage(currentUser);
+        setCurrentUser(currentUser);
+    }
+}
+
+function isBlocked(targetUserId) {
+    const currentUser = getCurrentUser();
+    return currentUser && currentUser.blocked && currentUser.blocked.includes(targetUserId);
+}
+
+// Helper to update user in storage
+function updateUserInStorage(updatedUser) {
+    const users = getUsers();
+    const index = users.findIndex(u => u.userId === updatedUser.userId);
+    if (index !== -1) {
+        users[index] = updatedUser;
+        saveUsers(users);
+    }
 }
 
 function isFollowing(targetUserId) {
@@ -241,6 +309,7 @@ function initializeElements() {
         elements.bioDisplay = document.getElementById('bio-display');
         elements.bioEdit = document.getElementById('bio-edit');
         elements.modalActionBtn = document.getElementById('modal-action-btn');
+        elements.modalBlockBtn = document.getElementById('modal-block-btn');
         elements.modalEditBtn = document.getElementById('modal-edit-btn');
         elements.modalSaveBtn = document.getElementById('modal-save-btn');
         elements.modalCancelBtn = document.getElementById('modal-cancel-btn');
@@ -287,8 +356,11 @@ function updateRecipientOptions() {
     // フォロー中のユーザーIDリスト
     const followingIds = currentUser.following || [];
 
-    // フォロー中のユーザーのみフィルタリング
-    const users = allUsers.filter(u => followingIds.includes(u.userId));
+    // フォロー中のユーザーのみフィルタリング (and not blocked)
+    const blocked = currentUser.blocked || [];
+    const users = allUsers
+        .filter(u => followingIds.includes(u.userId))
+        .filter(u => !blocked.includes(u.userId));
 
     elements.recipientSelect.innerHTML = '<option value="">送りたい相手を選択</option>';
     users.forEach(user => {
@@ -313,9 +385,17 @@ function renderSearchResult(user) {
         return;
     }
 
+    const isBlockedUser = isBlocked(user.userId);
     const isFollowed = isFollowing(user.userId);
-    const btnText = isFollowed ? 'フォロー中' : 'フォローする';
-    const btnClass = isFollowed ? 'follow-btn following' : 'follow-btn';
+
+    let btnText, btnClass;
+    if (isBlockedUser) {
+        btnText = 'ブロック中';
+        btnClass = 'follow-btn blocked'; // defined in css
+    } else {
+        btnText = isFollowed ? 'フォロー中' : 'フォローする';
+        btnClass = isFollowed ? 'follow-btn following' : 'follow-btn';
+    }
 
     const html = `
         <div class="user-card">
@@ -323,7 +403,7 @@ function renderSearchResult(user) {
                 <span class="user-name user-link" onclick="showUserProfile('${user.userId}')">${escapeHtml(user.name)}</span>
                 <span class="user-id">@${escapeHtml(user.userId)}</span>
             </div>
-            <button class="${btnClass}" onclick="toggleFollow('${user.userId}')">${btnText}</button>
+            <button class="${btnClass}" onclick="${isBlockedUser ? '' : `toggleFollow('${user.userId}')`}" ${isBlockedUser ? 'disabled' : ''}>${btnText}</button>
         </div>
     `;
 
@@ -389,6 +469,11 @@ window.showUserProfile = function (userId) {
     // UI設定
     elements.modalUsername.textContent = user.name;
     elements.modalUserid.textContent = '@' + user.userId;
+    elements.profileAvatarDisplay.textContent = user.avatar || '👤';
+
+    // 統計情報の更新
+    elements.followingCount.textContent = getFollowingCount(user.userId);
+    elements.followerCount.textContent = getFollowerCount(user.userId);
 
     // Bio表示
     if (user.bio) {
@@ -410,22 +495,52 @@ window.showUserProfile = function (userId) {
         elements.modalCancelBtn.classList.add('hidden');
     } else {
         elements.modalActionBtn.classList.remove('hidden');
+        elements.modalBlockBtn.classList.remove('hidden');
         elements.modalEditBtn.classList.add('hidden');
         elements.modalSaveBtn.classList.add('hidden');
         elements.modalCancelBtn.classList.add('hidden');
 
         updateFollowButton(user.userId);
+        updateBlockButton(user.userId);
+
+        // 以前のリスナーを削除するために置換が必要かもしれないが、
+        // replaceButtonListenerで毎回新しくなるのでOK
     }
 
     // ボタンのイベントリスナー再設定（クローンして置換することで重複防止）
     replaceButtonListener(elements.modalActionBtn, () => {
         window.toggleFollow(user.userId);
         updateFollowButton(user.userId);
+
+        // 統計情報の更新
+        elements.followerCount.textContent = getFollowerCount(user.userId);
+
         // 検索結果やリストの表示も同期させるために再描画
         if (elements.searchUserIdInput.value === user.userId) {
             renderSearchResult(user);
         }
         renderFollowingList();
+        renderFollowingList();
+    });
+
+    // Block button listener
+    replaceButtonListener(elements.modalBlockBtn, () => {
+        if (isBlocked(user.userId)) {
+            unblockUser(user.userId);
+        } else {
+            if (confirm('このユーザーをブロックしますか？\n（メッセージが届かなくなります）')) {
+                blockUser(user.userId);
+            }
+        }
+        // UI updates
+        showUserProfile(user.userId); // Reload modal content
+        renderFollowingList(); // Update friends list
+        updateRecipientOptions(); // Update message recipients
+
+        // 検索結果も更新
+        if (elements.searchUserIdInput.value === user.userId) {
+            renderSearchResult(user);
+        }
     });
 
     // モーダル表示
@@ -435,11 +550,34 @@ window.showUserProfile = function (userId) {
 
 function updateFollowButton(userId) {
     const isFollowed = isFollowing(userId);
+    // If blocked, disable follow button or hide it? For now just keep logic simple
     elements.modalActionBtn.textContent = isFollowed ? 'フォロー中' : 'フォローする';
     if (isFollowed) {
         elements.modalActionBtn.classList.add('following');
     } else {
         elements.modalActionBtn.classList.remove('following');
+    }
+}
+
+function updateBlockButton(userId) {
+    const blocked = isBlocked(userId);
+    elements.modalBlockBtn.textContent = blocked ? 'ブロック中' : 'ブロック';
+    if (blocked) {
+        elements.modalBlockBtn.classList.remove('btn-danger', 'btn-outline');
+        elements.modalBlockBtn.classList.add('btn-blocked');
+
+        // Inline style fallback
+        elements.modalBlockBtn.style.backgroundColor = '#ef4444';
+        elements.modalBlockBtn.style.color = '#ffffff';
+        elements.modalBlockBtn.style.border = '1px solid #ef4444';
+    } else {
+        elements.modalBlockBtn.classList.add('btn-danger');
+        elements.modalBlockBtn.classList.remove('btn-outline', 'btn-blocked');
+
+        // Reset inline styles
+        elements.modalBlockBtn.style.backgroundColor = '';
+        elements.modalBlockBtn.style.color = '';
+        elements.modalBlockBtn.style.border = '';
     }
 }
 
@@ -449,6 +587,7 @@ function replaceButtonListener(element, callback) {
     newElement.addEventListener('click', callback);
     // 参照を更新
     if (newElement.id === 'modal-action-btn') elements.modalActionBtn = newElement;
+    if (newElement.id === 'modal-block-btn') elements.modalBlockBtn = newElement;
 }
 
 // プロフィール編集モード
@@ -592,13 +731,19 @@ function updateReceivedBadge(count) {
 }
 
 // トースト通知を表示
+// トースト通知を表示
+let toastTimeout;
 function showToast(message) {
+    if (toastTimeout) {
+        clearTimeout(toastTimeout);
+    }
+
     const toastMessage = elements.toast.querySelector('.toast-message');
     toastMessage.textContent = message;
     elements.toast.classList.remove('hidden');
     elements.toast.classList.add('show');
 
-    setTimeout(() => {
+    toastTimeout = setTimeout(() => {
         elements.toast.classList.remove('show');
         setTimeout(() => {
             elements.toast.classList.add('hidden');
