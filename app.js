@@ -133,6 +133,11 @@ function getReceivedMessages(userId) {
         .filter(m => !blocked.includes(m.fromId));
 }
 
+function getSentMessages(userId) {
+    return getMessages()
+        .filter(m => m.fromId === userId);
+}
+
 // フォロー機能
 function followUser(targetUserId) {
     const currentUser = getCurrentUser();
@@ -776,7 +781,7 @@ function saveProfile() {
             // 自分自身の名前表示も更新（ヘッダーなど）
             const currentUserBadge = document.getElementById('current-user');
             if (currentUserBadge) {
-                currentUserBadge.textContent = updatedUser.name + ' (@' + updatedUser.userId + ')';
+                currentUserBadge.textContent = updatedUser.name;
             }
 
             showToast('プロフィールを更新しました');
@@ -1056,6 +1061,9 @@ function handleSendMessage(e) {
         showToast(`${recipientName}さんに感謝を送りました！`);
         elements.messageInput.value = '';
         elements.recipientSelect.value = '';
+
+        // Update Sent Messages List
+        renderSentMessages();
     }
 }
 
