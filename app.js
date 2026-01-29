@@ -305,11 +305,14 @@ function initializeElements() {
         elements.modalUsername = document.getElementById('modal-username');
         elements.modalUserid = document.getElementById('modal-userid');
         elements.profileAvatarDisplay = document.getElementById('profile-avatar-display');
-        elements.avatarEdit = document.getElementById('avatar-edit');
         elements.followingCount = document.getElementById('following-count');
         elements.followerCount = document.getElementById('follower-count');
         elements.bioDisplay = document.getElementById('bio-display');
         elements.bioEdit = document.getElementById('bio-edit');
+        elements.avatarUpload = document.getElementById('avatar-upload');
+        elements.avatarEditOverlay = document.getElementById('avatar-edit-overlay');
+        elements.usernameEdit = document.getElementById('username-edit');
+
         elements.modalActionBtn = document.getElementById('modal-action-btn');
         elements.modalBlockBtn = document.getElementById('modal-block-btn');
         elements.modalEditBtn = document.getElementById('modal-edit-btn');
@@ -513,7 +516,16 @@ window.showUserProfile = function (userId) {
     // UI設定
     elements.modalUsername.textContent = user.name;
     elements.modalUserid.textContent = '@' + user.userId;
-    elements.profileAvatarDisplay.textContent = user.avatar || '👤';
+    // アバター表示
+    if (user.avatar && user.avatar.startsWith('data:')) {
+        elements.profileAvatarDisplay.textContent = '';
+        elements.profileAvatarDisplay.style.backgroundImage = `url('${user.avatar}')`;
+        elements.profileAvatarDisplay.style.backgroundSize = 'cover';
+        elements.profileAvatarDisplay.style.backgroundPosition = 'center';
+    } else {
+        elements.profileAvatarDisplay.style.backgroundImage = '';
+        elements.profileAvatarDisplay.textContent = user.avatar || '👤';
+    }
 
     // 統計情報の更新
     elements.followingCount.textContent = getFollowingCount(user.userId);
@@ -534,6 +546,7 @@ window.showUserProfile = function (userId) {
     // ボタン制御
     if (isMe) {
         elements.modalActionBtn.classList.add('hidden');
+        elements.modalBlockBtn.classList.add('hidden');
         elements.modalEditBtn.classList.remove('hidden');
         elements.modalSaveBtn.classList.add('hidden');
         elements.modalCancelBtn.classList.add('hidden');
@@ -595,6 +608,36 @@ window.showUserProfile = function (userId) {
     setTimeout(() => elements.profileModal.classList.add('show'), 10);
 };
 
+// Helper: Resize Image
+function resizeImage(file, maxWidth, callback) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const img = new Image();
+        img.onload = function () {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+                height = Math.round(height * (maxWidth / width));
+                width = maxWidth;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Compress to JPEG with 0.8 quality
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            callback(dataUrl);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
 function updateFollowButton(userId) {
     const isFollowed = isFollowing(userId);
     const isBlockedUser = isBlocked(userId);
@@ -655,49 +698,110 @@ function enableEditProfile() {
     elements.bioDisplay.classList.add('hidden');
     elements.bioEdit.classList.remove('hidden');
 
-    elements.profileAvatarDisplay.classList.add('hidden');
-    elements.avatarEdit.classList.remove('hidden');
+    elements.modalUsername.classList.add('hidden');
+    elements.usernameEdit.classList.remove('hidden');
+
+    // 現在の値をセット
+    elements.usernameEdit.value = elements.modalUsername.textContent;
+
+    elements.avatarEditOverlay.classList.remove('hidden');
 
     elements.modalEditBtn.classList.add('hidden');
     elements.modalSaveBtn.classList.remove('hidden');
     elements.modalCancelBtn.classList.remove('hidden');
-    elements.bioEdit.focus();
+    elements.usernameEdit.focus();
+}
+
+function updateProfile(newName, newBio, newAvatar) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return null;
+
+    // Update fields if provided
+    if (newName !== undefined) currentUser.name = newName;
+    if (newBio !== undefined) currentUser.bio = newBio;
+    if (newAvatar !== undefined) currentUser.avatar = newAvatar;
+
+    updateUserInStorage(currentUser);
+    setCurrentUser(currentUser);
+    return currentUser;
 }
 
 function saveProfile() {
+    const newName = elements.usernameEdit.value.trim();
     const newBio = elements.bioEdit.value.trim();
-    const newAvatar = elements.avatarEdit.value.trim();
+    const avatarFile = elements.avatarUpload.files[0];
 
-    const updatedUser = updateProfile(newBio, newAvatar);
+    if (!newName) {
+        showToast('ユーザー名は必須です');
+        return;
+    }
 
-    if (updatedUser) {
-        // 表示更新
-        if (updatedUser.bio) {
-            elements.bioDisplay.innerHTML = `<p>${escapeHtml(updatedUser.bio)}</p>`;
-        } else {
-            elements.bioDisplay.innerHTML = `<p class="placeholder-text">自己紹介はまだありません</p>`;
+    const processSave = (avatarData) => {
+        const updatedUser = updateProfile(newName, newBio, avatarData);
+        if (updatedUser) {
+            // UI Update
+            elements.modalUsername.textContent = updatedUser.name;
+            elements.modalUserid.textContent = '@' + updatedUser.userId;
+
+            if (updatedUser.bio) {
+                elements.bioDisplay.innerHTML = `<p>${escapeHtml(updatedUser.bio)}</p>`;
+            } else {
+                elements.bioDisplay.innerHTML = `<p class="placeholder-text">自己紹介はまだありません</p>`;
+            }
+
+            // Avatar Update in UI
+            if (updatedUser.avatar && updatedUser.avatar.startsWith('data:')) {
+                elements.profileAvatarDisplay.textContent = '';
+                elements.profileAvatarDisplay.style.backgroundImage = `url('${updatedUser.avatar}')`;
+                elements.profileAvatarDisplay.style.backgroundSize = 'cover';
+                elements.profileAvatarDisplay.style.backgroundPosition = 'center';
+            } else {
+                elements.profileAvatarDisplay.style.backgroundImage = '';
+                elements.profileAvatarDisplay.textContent = updatedUser.avatar || '👤';
+            }
+
+            // Reset UI State
+            elements.bioDisplay.classList.remove('hidden');
+            elements.bioEdit.classList.add('hidden');
+
+            elements.modalUsername.classList.remove('hidden');
+            elements.usernameEdit.classList.add('hidden');
+
+            elements.avatarEditOverlay.classList.add('hidden');
+
+            elements.modalEditBtn.classList.remove('hidden');
+            elements.modalSaveBtn.classList.add('hidden');
+            elements.modalCancelBtn.classList.add('hidden');
+
+            // 自分自身の名前表示も更新（ヘッダーなど）
+            const currentUserBadge = document.getElementById('current-user');
+            if (currentUserBadge) {
+                currentUserBadge.textContent = updatedUser.name + ' (@' + updatedUser.userId + ')';
+            }
+
+            showToast('プロフィールを更新しました');
         }
+    };
 
-        elements.profileAvatarDisplay.textContent = updatedUser.avatar || '👤';
-
-        elements.bioDisplay.classList.remove('hidden');
-        elements.bioEdit.classList.add('hidden');
-        elements.profileAvatarDisplay.classList.remove('hidden');
-        elements.avatarEdit.classList.add('hidden');
-
-        elements.modalEditBtn.classList.remove('hidden');
-        elements.modalSaveBtn.classList.add('hidden');
-        elements.modalCancelBtn.classList.add('hidden');
-
-        showToast('プロフィールを更新しました');
+    if (avatarFile) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            processSave(e.target.result);
+        };
+        reader.readAsDataURL(avatarFile);
+    } else {
+        processSave(undefined); // No avatar update
     }
 }
 
 function cancelEditProfile() {
     elements.bioDisplay.classList.remove('hidden');
     elements.bioEdit.classList.add('hidden');
-    elements.profileAvatarDisplay.classList.remove('hidden');
-    elements.avatarEdit.classList.add('hidden');
+
+    elements.modalUsername.classList.remove('hidden');
+    elements.usernameEdit.classList.add('hidden');
+
+    elements.avatarEditOverlay.classList.add('hidden');
 
     elements.modalEditBtn.classList.remove('hidden');
     elements.modalSaveBtn.classList.add('hidden');
@@ -706,7 +810,17 @@ function cancelEditProfile() {
     // 元の値に戻す
     const currentUser = getCurrentUser();
     elements.bioEdit.value = currentUser.bio || '';
-    elements.avatarEdit.value = currentUser.avatar || '👤';
+    elements.usernameEdit.value = currentUser.name || '';
+    elements.avatarUpload.value = ''; // Clear file input
+
+    // Reset avatar preview if it was changed purely in UI
+    if (currentUser.avatar && currentUser.avatar.startsWith('data:')) {
+        elements.profileAvatarDisplay.textContent = '';
+        elements.profileAvatarDisplay.style.backgroundImage = `url('${currentUser.avatar}')`;
+    } else {
+        elements.profileAvatarDisplay.style.backgroundImage = '';
+        elements.profileAvatarDisplay.textContent = currentUser.avatar || '👤';
+    }
 }
 
 function closeModal() {
@@ -1003,6 +1117,25 @@ function initialize() {
         elements.modalEditBtn.addEventListener('click', enableEditProfile);
         elements.modalSaveBtn.addEventListener('click', saveProfile);
         elements.modalCancelBtn.addEventListener('click', cancelEditProfile);
+
+        // Avatar Upload Events
+        elements.avatarEditOverlay.addEventListener('click', () => {
+            elements.avatarUpload.click();
+        });
+
+        elements.avatarUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    elements.profileAvatarDisplay.textContent = '';
+                    elements.profileAvatarDisplay.style.backgroundImage = `url('${e.target.result}')`;
+                    elements.profileAvatarDisplay.style.backgroundSize = 'cover';
+                    elements.profileAvatarDisplay.style.backgroundPosition = 'center';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
     }
 
     // ログイン状態を確認とリダイレクト

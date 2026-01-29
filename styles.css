@@ -832,10 +832,25 @@ body::after {
 }
 
 .profile-avatar {
+    width: 100px;
+    height: 100px;
     font-size: 64px;
-    margin-bottom: 12px;
+    line-height: 100px;
+    /* Center emoji vertically */
+    margin: 0;
+    /* Margin handled by wrapper */
+    /* Center horizontally */
     cursor: pointer;
     transition: transform 0.2s;
+    border-radius: 50%;
+    /* Circle shape */
+    display: flex;
+    /* Flexbox for centering */
+    align-items: center;
+    justify-content: center;
+    background-color: var(--gray-100);
+    /* Fallback background */
+    object-fit: cover;
 }
 
 .profile-avatar.editable:hover {
@@ -1040,4 +1055,46 @@ body::after {
     color: white !important;
     border: 1px solid #ef4444 !important;
     cursor: pointer !important;
+}
+
+/* Edit Profile Styles */
+.avatar-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 8px;
+}
+
+/* Edit Profile Styles */
+.edit-input {
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    width: 80%;
+}
+
+.avatar-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.profile-avatar {
+    position: relative;
+    /* For overlay positioning */
 }

@@ -150,9 +150,14 @@
         <div class="modal-content">
             <span class="close-modal">&times;</span>
             <div class="profile-header">
-                <div id="profile-avatar-display" class="profile-avatar">👤</div>
-                <input type="text" id="avatar-edit" class="avatar-input hidden" placeholder="👤" maxlength="2">
+                <div class="avatar-wrapper">
+                    <div id="profile-avatar-display" class="profile-avatar">👤</div>
+                    <div id="avatar-edit-overlay" class="avatar-overlay hidden">📷</div>
+                </div>
+                <input type="file" id="avatar-upload" class="hidden" accept="image/*">
+
                 <h2 id="modal-username">User Name</h2>
+                <input type="text" id="username-edit" class="edit-input hidden" placeholder="ユーザー名" maxlength="20">
                 <p id="modal-userid" class="profile-userid">@userid</p>
 
                 <div class="profile-stats">
