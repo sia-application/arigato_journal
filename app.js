@@ -91,7 +91,7 @@ function saveMessages(messages) {
     localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
 }
 
-function sendMessage(toId, toName, message) {
+function sendMessage(toId, toName, message, options = {}) {
     const currentUser = getCurrentUser();
     if (!currentUser) return null;
 
@@ -104,7 +104,9 @@ function sendMessage(toId, toName, message) {
         toName: toName,
         message: message,
         createdAt: Date.now(),
-        isRead: false // Initialize read status
+        isRead: false, // Initialize read status
+        replyTo: options.replyTo || null, // Save reply context if exists
+        rootId: options.rootId || null // Thread Root ID
     };
     messages.unshift(newMessage);
     saveMessages(messages);
@@ -122,6 +124,134 @@ function getReceivedMessages(userId) {
 function getSentMessages(userId) {
     return getMessages()
         .filter(m => m.fromId === userId);
+}
+
+// Thread Logic
+let currentThreadContext = null; // { rootId, otherUserId, otherUserName }
+
+function openThread(messageId) {
+    const messages = getMessages();
+    const targetMsg = messages.find(m => m.id === messageId);
+    if (!targetMsg) return;
+
+    const currentUser = getCurrentUser();
+
+    // Determine Root ID
+    // If message has rootId, use it. If not, this message is the root.
+    const rootId = targetMsg.rootId || targetMsg.id;
+
+    // Identify the "other" participant for the header
+    const otherId = (targetMsg.fromId === currentUser.userId) ? targetMsg.toId : targetMsg.fromId;
+    const otherName = (targetMsg.fromId === currentUser.userId) ? targetMsg.toName : targetMsg.fromName;
+
+    currentThreadContext = {
+        rootId: rootId,
+        otherUserId: otherId,
+        otherUserName: otherName
+    };
+
+    renderThreadMessages();
+
+    // Show Modal
+    const modal = document.getElementById('thread-modal');
+    modal.classList.remove('hidden');
+    // Trigger reflow
+    void modal.offsetWidth;
+    modal.classList.add('show');
+}
+
+function closeThread() {
+    const modal = document.getElementById('thread-modal');
+    modal.classList.remove('show');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        currentThreadContext = null;
+    }, 300);
+}
+
+function renderThreadMessages() {
+    if (!currentThreadContext) return;
+
+    const messages = getMessages();
+    const currentUser = getCurrentUser();
+
+    // Filter messages: 
+    // 1. Matches rootId
+    // 2. OR is the root message itself
+    const threadMessages = messages.filter(m =>
+        m.rootId === currentThreadContext.rootId || m.id === currentThreadContext.rootId
+    );
+
+    // Sort by Date (Oldest First for conversation flow)
+    threadMessages.sort((a, b) => a.createdAt - b.createdAt);
+
+    const listContainer = document.getElementById('thread-messages-list');
+    listContainer.innerHTML = '';
+
+    if (threadMessages.length === 0) {
+        listContainer.innerHTML = '<p style="text-align:center; color:#999;">メッセージが見つかりません</p>';
+        return;
+    }
+
+    threadMessages.forEach(msg => {
+        // Reuse createMessageCard logic but maybe simplified?
+        // Using 'timeline' type for now to show standard card
+        listContainer.innerHTML += createMessageCard(msg, 'timeline');
+    });
+
+    // Scroll to bottom
+    setTimeout(() => {
+        listContainer.scrollTop = listContainer.scrollHeight;
+    }, 10);
+}
+
+function handleThreadSend(e) {
+    e.preventDefault();
+    if (!currentThreadContext) return;
+
+    const input = document.getElementById('thread-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    // Send Message
+    // options: replyTo (last message?), rootId
+
+    // Find last message to link replyTo? Or just link to Root?
+    // Let's find the specific message we are replying to implies context.
+    // In a flat thread view, maybe we just reply to the "other" person with rootId set.
+
+    // For rich context, let's just set rootId.
+    // AND if we want `replyTo` snippet, we could grab the last message from the other person.
+
+    const messages = getMessages();
+    const threadMessages = messages.filter(m =>
+        m.rootId === currentThreadContext.rootId || m.id === currentThreadContext.rootId
+    );
+    // Find last message from the OTHER person
+    const lastMsg = threadMessages.reverse().find(m => m.fromId === currentThreadContext.otherUserId);
+
+    const options = {
+        rootId: currentThreadContext.rootId
+    };
+
+    if (lastMsg) {
+        options.replyTo = {
+            id: lastMsg.id,
+            name: lastMsg.fromName,
+            text: lastMsg.message
+        };
+    }
+
+    // Call global sendMessage
+    const newMessage = sendMessage(currentThreadContext.otherUserId, currentThreadContext.otherUserName, text, options);
+
+    if (newMessage) {
+        input.value = '';
+        renderThreadMessages(); // Refresh UI
+
+        // Also update background badges/lists if necessary
+        // (Optional: update main timeline if open)
+    }
 }
 
 // フォロー機能
@@ -333,6 +463,13 @@ function initializeElements() {
         elements.modalSaveBtn = document.getElementById('modal-save-btn');
         elements.modalCancelBtn = document.getElementById('modal-cancel-btn');
         elements.modalThanksBtn = document.getElementById('modal-thanks-btn');
+
+        // Thread Modal Elements
+        elements.threadModal = document.getElementById('thread-modal');
+        elements.closeThreadModal = document.querySelector('.close-thread-modal');
+        elements.threadMessagesList = document.getElementById('thread-messages-list');
+        elements.threadReplyForm = document.getElementById('thread-reply-form');
+        elements.threadInput = document.getElementById('thread-input');
     }
 
     elements.toast = document.getElementById('toast');
@@ -985,11 +1122,43 @@ function createMessageCard(msg, type = 'sent') {
 
     // 受信の場合は相手（自分）を表示しない
     let toHtml = '';
+    // 返信ボタン
+    let actionsHtml = '';
+
     if (type !== 'received') {
         toHtml = `
             <span class="message-arrow">→</span>
             <span class="message-to user-link" onclick="showUserProfile('${escapeHtml(msg.toId)}')">${escapeHtml(msg.toName)}</span>
          `;
+    }
+
+    // 自分のメッセージ以外で、かつタイムラインか受信ボックスの場合に返信ボタンを表示
+    if (!isOwnMessage) {
+        // Changed: Reply Button now opens Thread Modal
+        actionsHtml = `
+            <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
+                ↩ 返信
+            </button>
+        `;
+    } else {
+        // OPTIONAL: Allow viewing thread even for own messages?
+        // Yes, helpful to see replies.
+        actionsHtml = `
+            <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
+                💬 スレッド
+            </button>
+        `;
+    }
+
+    // Reply Context Rendering
+    let replyContextHtml = '';
+    if (msg.replyTo) {
+        replyContextHtml = `
+            <div class="reply-context">
+                <span class="reply-link-name">↩ Replying to ${escapeHtml(msg.replyTo.name)}</span>
+                <span class="reply-snippet">${escapeHtml(msg.replyTo.text)}</span>
+            </div>
+        `;
     }
 
     // Unread styling
@@ -1003,10 +1172,12 @@ function createMessageCard(msg, type = 'sent') {
                     <span class="message-from user-link" onclick="showUserProfile('${escapeHtml(msg.fromId)}')">${escapeHtml(msg.fromName)}</span>
                     ${unreadBadge}
                     ${toHtml}
+                    ${actionsHtml}
                 </div>
                 <span class="message-time">${timeString}</span>
             </div>
             <div class="message-body">
+                ${replyContextHtml}
                 ${escapeHtml(msg.message)}
             </div>
         </div>
@@ -1014,7 +1185,6 @@ function createMessageCard(msg, type = 'sent') {
 }
 
 // 受信メッセージを表示
-// 受信メッセージを表示 (Sender Grouping)
 function renderReceivedMessages() {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
@@ -1173,7 +1343,6 @@ function renderTimeline() {
     }
 }
 
-
 // 受信バッジを更新
 function updateReceivedBadge(count) {
     if (count > 0) {
@@ -1184,7 +1353,6 @@ function updateReceivedBadge(count) {
     }
 }
 
-// トースト通知を表示
 // トースト通知を表示
 let toastTimeout;
 function showToast(message) {
@@ -1226,92 +1394,10 @@ function formatDate(dateInput) {
     return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
 }
 
-// ============================
-// イベントハンドラ
-// ============================
 
-function handleLogin(e) {
-    e.preventDefault();
-    const userId = elements.usernameInput.value.trim(); // ユーザー名入力欄をID入力欄として使用
-    const password = elements.passwordInput.value.trim();
-
-    if (!userId || !password) {
-        showToast('ユーザーIDとパスワードを入力してください');
-        return;
-    }
-
-    // ユーザーを検索
-    let user = findUser(userId);
-    if (!user) {
-        showToast('ユーザーIDまたはパスワードが間違っています'); // セキュリティのため詳細は伏せる
-        return;
-    } else {
-        // パスワード確認
-        if (user.password && user.password !== password) {
-            showToast('ユーザーIDまたはパスワードが間違っています');
-            return;
-        }
-
-        showToast(`おかえりなさい、${user.name}さん！`);
-    }
-
-    setCurrentUser(user);
-
-    // ページ遷移
-    setTimeout(() => {
-        window.location.href = 'top.html';
-    }, 1000);
-}
-
-function handleRegister(e) {
-    e.preventDefault();
-    const userId = elements.regUserIdInput.value.trim();
-    const username = elements.regUsernameInput.value.trim();
-    const password = elements.regPasswordInput.value.trim();
-
-    if (!userId || !username || !password) {
-        showToast('すべての項目を入力してください');
-        return;
-    }
-
-    // 重複チェック
-    if (findUser(userId)) {
-        showToast('このユーザーIDは既に使用されています');
-        return;
-    }
-
-    const newUser = createUser(userId, username, password);
-    setCurrentUser(newUser);
-
-    showToast(`ようこそ、${username}さん！`);
-    setTimeout(() => {
-        window.location.href = 'top.html';
-    }, 1000);
-}
-
-function handleLogout() {
-    clearCurrentUser();
-    window.location.href = 'index.html';
-}
-
-function handleSearch() {
-    const userId = elements.searchUserIdInput.value.trim();
-    if (!userId) return;
-
-    // ブロック中のユーザーは検索結果に表示しない
-    if (isBlocked(userId)) {
-        elements.searchResult.innerHTML = '';
-        showToast('このユーザーは表示できません');
-        return;
-    }
-
-    const user = findUser(userId);
-    renderSearchResult(user);
-}
 
 function handleSendMessage(e) {
     e.preventDefault();
-
 
     const recipientId = elements.recipientSelect.value;
     const recipientOption = elements.recipientSelect.options[elements.recipientSelect.selectedIndex];
@@ -1320,12 +1406,24 @@ function handleSendMessage(e) {
 
     if (!recipientId || !message) return;
 
-    const newMessage = sendMessage(recipientId, recipientName, message);
+    // Send logic modified to accept object or parameters?
+    // modify sendMessage signature to accept options? or just pass it in message object construction within sendMessage?
+    // Let's modify sendMessage to accept an optional 4th argument options
+
+    const options = {};
+    if (currentReplyContext) {
+        options.replyTo = currentReplyContext;
+    }
+
+    const newMessage = sendMessage(recipientId, recipientName, message, options);
 
     if (newMessage) {
         showToast(`${recipientName}さんにありがとうを送りました！`);
         elements.messageInput.value = '';
         elements.recipientSelect.value = '';
+
+        // Reset Reply Context
+        cancelReply();
 
         // Update Sent Messages List
         renderSentMessages();
@@ -1359,8 +1457,6 @@ function initialize() {
     if (elements.mainScreen) {
         elements.logoutBtn.addEventListener('click', handleLogout);
         elements.sendForm.addEventListener('submit', handleSendMessage);
-        elements.logoutBtn.addEventListener('click', handleLogout);
-        elements.sendForm.addEventListener('submit', handleSendMessage);
 
         // リアルタイム検索
         elements.searchUserIdInput.addEventListener('input', (e) => {
@@ -1389,9 +1485,23 @@ function initialize() {
         });
         elements.modalEditBtn.addEventListener('click', enableEditProfile);
         elements.modalSaveBtn.addEventListener('click', saveProfile);
-        elements.modalEditBtn.addEventListener('click', enableEditProfile);
-        elements.modalSaveBtn.addEventListener('click', saveProfile);
         elements.modalCancelBtn.addEventListener('click', cancelEditProfile);
+
+        // Reply Preview Events
+        document.getElementById('cancel-reply-btn').addEventListener('click', cancelReply);
+
+        // Thread Modal Events
+        if (elements.closeThreadModal) {
+            elements.closeThreadModal.addEventListener('click', closeThread);
+        }
+        if (elements.threadModal) {
+            elements.threadModal.addEventListener('click', (e) => {
+                if (e.target === elements.threadModal) closeThread();
+            });
+        }
+        if (elements.threadReplyForm) {
+            elements.threadReplyForm.addEventListener('submit', handleThreadSend);
+        }
 
         // Blocked List Toggle
         if (elements.blockedListToggle) {
@@ -1492,6 +1602,176 @@ function initialize() {
         const myMessages = getReceivedMessages(currentUser.userId);
         const unreadCount = myMessages.filter(m => !m.isRead).length;
         updateReceivedBadge(unreadCount);
+    }
+}
+
+// Reply Context State
+let currentReplyContext = null;
+
+function startReply(messageId) {
+    const messages = getMessages();
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg) return;
+
+    // Set Context
+    currentReplyContext = {
+        id: msg.id,
+        name: msg.fromName,
+        text: msg.message
+    };
+
+    // Update UI
+    const preview = document.getElementById('reply-preview');
+    preview.querySelector('.reply-to-name').textContent = `Replying to ${currentReplyContext.name}`;
+    preview.querySelector('.reply-text-snippet').textContent = currentReplyContext.text;
+    preview.classList.remove('hidden');
+
+    // Switch Tab & Set Recipient
+    openSendTabWithRecipient(msg.fromId);
+}
+
+function cancelReply() {
+    currentReplyContext = null;
+    document.getElementById('reply-preview').classList.add('hidden');
+}
+
+// Override openSendTabWithRecipient to verify context validity
+// If user changes recipient manually, we might want to clear context, but for now simple logic.
+// The original function is modified to NOT clear the form if we are replying.
+const originalOpenSendTab = window.openSendTabWithRecipient;
+window.openSendTabWithRecipient = function (userId) {
+    // If we called this NOT via startReply (i.e. just "Send Thanks" button), should we clear reply context?
+    // Let's rely on explicit cancel for now, or clear if the recipient doesn't match the reply context sender.
+    if (currentReplyContext) {
+        // If the intended recipient is different from the reply context author, warn or clear?
+        // Actually, msg.fromId is the recipient.
+        // We'll trust the flow for now.
+    }
+
+    // Call original logic (which sets recipient)
+    // We need to recreate the logic inside here because we don't have access to the original function scope easily if we didn't save it.
+    // Wait, I defined it globally above.
+
+    // Actually, I should update the original function to be aware of reply context or just replicate logic.
+    // Replicating logic for simplicity and to add specific behavior.
+
+    const user = findUser(userId);
+    if (!user) return;
+
+    if (elements.profileModal.classList.contains('show')) {
+        closeModal();
+    }
+
+    switchTab('send');
+    elements.recipientSelect.value = userId;
+    elements.recipientSelect.disabled = true;
+    elements.sendForm.scrollIntoView({ behavior: 'smooth' });
+};
+
+// ============================
+// イベントハンドラ (Restored)
+// ============================
+
+function handleLogin(e) {
+    e.preventDefault();
+    const userId = elements.usernameInput.value.trim();
+    const password = elements.passwordInput.value.trim();
+
+    if (!userId || !password) {
+        showToast('ユーザーIDとパスワードを入力してください');
+        return;
+    }
+
+    let user = findUser(userId);
+    if (!user) {
+        showToast('ユーザーIDまたはパスワードが間違っています');
+        return;
+    } else {
+        if (user.password && user.password !== password) {
+            showToast('ユーザーIDまたはパスワードが間違っています');
+            return;
+        }
+        showToast(`おかえりなさい、${user.name}さん！`);
+    }
+
+    setCurrentUser(user);
+
+    setTimeout(() => {
+        window.location.href = 'top.html';
+    }, 1000);
+}
+
+function handleRegister(e) {
+    e.preventDefault();
+    const userId = elements.regUserIdInput.value.trim();
+    const username = elements.regUsernameInput.value.trim();
+    const password = elements.regPasswordInput.value.trim();
+
+    if (!userId || !username || !password) {
+        showToast('すべての項目を入力してください');
+        return;
+    }
+
+    if (findUser(userId)) {
+        showToast('このユーザーIDは既に使用されています');
+        return;
+    }
+
+    const newUser = createUser(userId, username, password);
+    setCurrentUser(newUser);
+
+    showToast(`ようこそ、${username}さん！`);
+    setTimeout(() => {
+        window.location.href = 'top.html';
+    }, 1000);
+}
+
+function handleLogout() {
+    clearCurrentUser();
+    window.location.href = 'index.html';
+}
+
+function handleSearch() {
+    const userId = elements.searchUserIdInput.value.trim();
+    if (!userId) return;
+
+    if (isBlocked(userId)) {
+        elements.searchResult.innerHTML = '';
+        showToast('このユーザーは表示できません');
+        return;
+    }
+
+    const user = findUser(userId);
+    renderSearchResult(user);
+}
+
+function handleSendMessage(e) {
+    e.preventDefault();
+
+    const recipientId = elements.recipientSelect.value;
+    const recipientOption = elements.recipientSelect.options[elements.recipientSelect.selectedIndex];
+    const recipientName = recipientOption.dataset.name;
+    const message = elements.messageInput.value.trim();
+
+    if (!recipientId || !message) return;
+
+    const options = {};
+    if (currentReplyContext) {
+        options.replyTo = currentReplyContext;
+    }
+
+    const newMessage = sendMessage(recipientId, recipientName, message, options);
+
+    if (newMessage) {
+        showToast(`${recipientName}さんにありがとうを送りました！`);
+        elements.messageInput.value = '';
+        elements.recipientSelect.value = '';
+
+        // Reset Reply Context
+        cancelReply();
+
+        // Update Sent Messages List
+        renderSentMessages();
     }
 }
 

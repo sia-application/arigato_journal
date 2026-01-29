@@ -81,6 +81,19 @@
                                 <option value="">ありがとうのメッセージを送りたい相手を選択</option>
                             </select>
                         </div>
+
+                        <!-- Reply Preview Container -->
+                        <div id="reply-preview" class="reply-preview hidden">
+                            <div class="reply-preview-content">
+                                <span class="reply-icon">↩</span>
+                                <div class="reply-info">
+                                    <span class="reply-to-name">Replying to...</span>
+                                    <p class="reply-text-snippet">Message snippet...</p>
+                                </div>
+                                <button type="button" id="cancel-reply-btn" class="btn-close">×</button>
+                            </div>
+                        </div>
+
                         <div class="input-group">
                             <label for="message">ありがとうのメッセージ</label>
                             <textarea id="message" rows="4" placeholder="ありがとうの気持ちを書いてみましょう..." required></textarea>
@@ -251,6 +264,27 @@
                     <button id="modal-save-btn" class="btn btn-primary hidden">保存する</button>
                     <button id="modal-cancel-btn" class="btn btn-outline hidden">キャンセル</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thread Modal -->
+    <div id="thread-modal" class="modal hidden">
+        <div class="modal-content thread-modal-content">
+            <button type="button" class="close-modal close-thread-modal">&times;</button>
+            <div class="thread-header">
+                <h3>スレッド</h3>
+            </div>
+
+            <div id="thread-messages-list" class="thread-messages-list">
+                <!-- Thread messages rendered here -->
+            </div>
+
+            <div class="thread-footer">
+                <form id="thread-reply-form" class="thread-reply-form">
+                    <textarea id="thread-input" placeholder="返信を入力..." rows="1" required></textarea>
+                    <button type="submit" class="btn btn-sm btn-primary">送信</button>
+                </form>
             </div>
         </div>
     </div>
