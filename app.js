@@ -1134,15 +1134,12 @@ function createMessageCard(msg, type = 'sent') {
 
     // 自分のメッセージ以外で、かつタイムラインか受信ボックスの場合に返信ボタンを表示
     if (!isOwnMessage) {
-        // Changed: Reply Button now opens Thread Modal
         actionsHtml = `
             <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
-                ↩ 返信
+                💬 スレッド
             </button>
         `;
     } else {
-        // OPTIONAL: Allow viewing thread even for own messages?
-        // Yes, helpful to see replies.
         actionsHtml = `
             <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
                 💬 スレッド
