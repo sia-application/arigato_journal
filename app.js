@@ -914,6 +914,13 @@ function handleSearch() {
     const userId = elements.searchUserIdInput.value.trim();
     if (!userId) return;
 
+    // ブロック中のユーザーは検索結果に表示しない
+    if (isBlocked(userId)) {
+        elements.searchResult.innerHTML = '';
+        showToast('このユーザーは表示できません');
+        return;
+    }
+
     const user = findUser(userId);
     renderSearchResult(user);
 }
