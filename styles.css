@@ -13,6 +13,12 @@
     --text-secondary: #718096;
     --text-light: #a0aec0;
 
+    --gray-200: #e2e8f0;
+    --gray-300: #cbd5e1;
+    /* Added missing variable */
+    --gray-400: #94a3b8;
+    --gray-500: #64748b;
+
     --pink-100: #fff5f8;
     --pink-200: #fed7e2;
     --pink-300: #fbb6ce;
@@ -192,9 +198,26 @@ body::after {
 
 .login-note {
     margin-top: 24px;
-    font-size: 13px;
-    color: var(--text-light);
 }
+
+.profile-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    flex-wrap: nowrap !important;
+    /* Force single row */
+    justify-content: space-between;
+    /* Distribute space */
+    align-items: center;
+}
+
+.profile-actions .btn {
+    white-space: nowrap !important;
+    min-width: max-content;
+    flex-shrink: 0;
+}
+
+
 
 /* ============================
    フォーム要素
@@ -815,11 +838,14 @@ body::after {
 
 .modal-content {
     background-color: white;
-    padding: 30px;
+    padding: 32px;
     border-radius: var(--radius-lg);
     width: 90%;
     max-width: 500px;
+    /* Increased from default/previous value if it was smaller */
     position: relative;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: var(--shadow-xl);
     transform: translateY(20px);
     transition: transform 0.3s;
@@ -884,6 +910,18 @@ body::after {
     border-radius: var(--radius-md);
     margin-bottom: 12px;
     padding: 4px;
+}
+
+/* Follows You Badge */
+.follows-you-badge {
+    display: inline-block;
+    background-color: #edf2f7;
+    color: #4a5568;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-top: 4px;
+    font-weight: 500;
 }
 
 .profile-stats {
@@ -1135,7 +1173,34 @@ body::after {
     background-color: var(--orange-600);
     /* Darker orange */
     transform: translateY(-1px);
+    transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(237, 137, 54, 0.2);
+}
+
+/* Soft Disabled Button (Looks disabled but clickable for alerts) */
+.btn-disabled-soft {
+    background-color: #ffffff !important;
+    /* White background for better contrast */
+    border: 1px solid var(--gray-300) !important;
+    /* Explicit border definition */
+    color: var(--text-light) !important;
+    cursor: default !important;
+    box-shadow: none !important;
+    opacity: 0.7;
+    white-space: nowrap;
+    /* Prevent text wrapping */
+    display: inline-flex;
+    /* Ensure flex behavior compatibility */
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    /* Ensure padding doesn't break dims */
+    line-height: 1.5;
+}
+
+.btn-disabled-soft:hover {
+    transform: none !important;
+    box-shadow: none !important;
 }
 
 /* Small Button Utility */

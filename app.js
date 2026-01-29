@@ -307,6 +307,8 @@ function initializeElements() {
         elements.followingList = document.getElementById('following-list');
         elements.blockedList = document.getElementById('blocked-list');
         elements.blockedListToggle = document.getElementById('blocked-list-toggle');
+        elements.followerList = document.getElementById('follower-list');
+        elements.followerListToggle = document.getElementById('follower-list-toggle');
 
         elements.followingListToggle = document.getElementById('following-list-toggle');
 
@@ -317,7 +319,9 @@ function initializeElements() {
         elements.profileModal = document.getElementById('profile-modal');
         elements.closeModal = elements.profileModal.querySelector('.close-modal');
         elements.modalUsername = document.getElementById('modal-username');
+        elements.usernameEdit = document.getElementById('username-edit');
         elements.modalUserid = document.getElementById('modal-userid');
+        elements.modalFollowsYouBadge = document.getElementById('modal-follows-you-badge');
         elements.profileAvatarDisplay = document.getElementById('profile-avatar-display');
         elements.followingCount = document.getElementById('following-count');
         elements.followerCount = document.getElementById('follower-count');
@@ -362,6 +366,7 @@ function switchTab(tabName) {
         renderSentMessages();
     } else if (tabName === 'friends') {
         renderFollowingList();
+        renderFollowerList();
         renderBlockedList();
     }
 }
@@ -488,7 +493,11 @@ window.toggleFollow = function (targetUserId) {
     if (searchInputVal === targetUserId) {
         renderSearchResult(searchedUser);
     }
+    if (searchInputVal === targetUserId) {
+        renderSearchResult(searchedUser);
+    }
     renderFollowingList();
+    renderFollowerList(); // Update follower list UI
     renderBlockedList();
     updateRecipientOptions(); // 宛先リストも更新
 };
@@ -540,6 +549,66 @@ function renderBlockedList() {
     }
 }
 
+
+function renderFollowerList() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    const allUsers = getUsers();
+    // Find users who follow me
+    const followers = allUsers.filter(u => u.following && u.following.includes(currentUser.userId));
+
+    // Using filtered list for display
+    // const blockedIds = currentUser.blocked || [];
+    // Should we show blocked users in follower list? usually yes, or maybe grayed out.
+    // For now, simple list.
+
+    if (followers.length === 0) {
+        elements.followerList.innerHTML = `
+            <div class="empty-state">
+                <span class="empty-icon">🥰</span>
+                <p>まだフォロワーはいません</p>
+            </div>
+        `;
+    } else {
+        elements.followerList.innerHTML = followers.map(user => {
+            const isBlockedUser = isBlocked(user.userId);
+            const isFollowed = isFollowing(user.userId);
+
+            // Determine Follow button state
+            let followBtnHtml = '';
+            if (isBlockedUser) {
+                followBtnHtml = `<button class="follow-btn blocked" onclick="toggleFollow('${user.userId}')">ブロック中</button>`;
+            } else {
+                const btnText = isFollowed ? 'フォロー中' : 'フォローする';
+                const btnClass = isFollowed ? 'follow-btn following' : 'follow-btn';
+                followBtnHtml = `<button class="${btnClass}" onclick="toggleFollow('${user.userId}')">${btnText}</button>`;
+            }
+
+            // Determine Thanks button state
+            let thanksBtnHtml = '';
+            if (isFollowed) {
+                thanksBtnHtml = `<button class="btn-sm btn-success" style="border-radius: 50px;" onclick="openSendTabWithRecipient('${user.userId}')">ありがとうを送る</button>`;
+            } else {
+                // Disabled style and toast action
+                thanksBtnHtml = `<button class="btn-sm btn-disabled-soft" style="border-radius: 50px;" onclick="showToast('ありがとうを送るにはフォローが必要です')">ありがとうを送る</button>`;
+            }
+
+            return `
+            <div class="user-card">
+                <div class="user-info">
+                    <span class="user-name user-link" onclick="showUserProfile('${user.userId}')">${escapeHtml(user.name)}</span>
+                    <span class="user-id">@${escapeHtml(user.userId)}</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    ${thanksBtnHtml}
+                    ${followBtnHtml}
+                </div>
+            </div>
+        `}).join('');
+    }
+}
+
 // プロフィール表示
 window.showUserProfile = function (userId) {
     const user = findUser(userId);
@@ -553,6 +622,17 @@ window.showUserProfile = function (userId) {
     // UI設定
     elements.modalUsername.textContent = user.name;
     elements.modalUserid.textContent = '@' + user.userId;
+
+    // Follows You Badge Logic
+    if (elements.modalFollowsYouBadge) {
+        const followsMe = user.following && user.following.includes(currentUser.userId);
+        if (followsMe && !isMe) {
+            elements.modalFollowsYouBadge.classList.remove('hidden');
+        } else {
+            elements.modalFollowsYouBadge.classList.add('hidden');
+        }
+    }
+
     // アバター表示
     if (user.avatar && user.avatar.startsWith('data:')) {
         elements.profileAvatarDisplay.textContent = '';
@@ -603,9 +683,13 @@ window.showUserProfile = function (userId) {
         // replaceButtonListenerで毎回新しくなるのでOK
     }
 
-    // Thanks Button Listener
+    // Thanks Button Listener with Conditional Logic
     replaceButtonListener(elements.modalThanksBtn, () => {
-        openSendTabWithRecipient(user.userId);
+        if (isFollowing(user.userId)) {
+            openSendTabWithRecipient(user.userId);
+        } else {
+            showToast('ありがとうを送るにはフォローが必要です');
+        }
     });
 
     // Block button listener
@@ -684,7 +768,7 @@ function updateFollowButton(userId) {
     const isBlockedUser = isBlocked(userId);
 
     if (isBlockedUser) {
-        elements.modalActionBtn.textContent = 'フォローできません';
+        elements.modalActionBtn.textContent = 'フォロー不可';
         elements.modalActionBtn.disabled = true;
         elements.modalActionBtn.classList.add('blocked-action');
         elements.modalActionBtn.classList.remove('following', 'btn-primary', 'btn-follow-action');
@@ -692,6 +776,16 @@ function updateFollowButton(userId) {
         elements.modalActionBtn.disabled = false;
         elements.modalActionBtn.textContent = isFollowed ? 'フォロー中' : 'フォローする';
         elements.modalActionBtn.classList.remove('blocked-action');
+
+        // Show Thanks Button always (state is visual only now)
+        elements.modalThanksBtn.classList.remove('hidden');
+
+        // Logic for Thanks Button Visual State
+        if (isFollowed) {
+            elements.modalThanksBtn.classList.remove('btn-disabled-soft');
+        } else {
+            elements.modalThanksBtn.classList.add('btn-disabled-soft');
+        }
 
         if (isFollowed) {
             elements.modalActionBtn.classList.add('following');
@@ -874,17 +968,26 @@ function closeModal() {
 }
 
 // メッセージカードのHTML生成
-function createMessageCard(msg) {
+// メッセージカードのHTML生成
+function createMessageCard(msg, type = 'sent') {
     const date = new Date(msg.createdAt);
     const timeString = formatDate(date);
+
+    // 受信の場合は相手（自分）を表示しない
+    let toHtml = '';
+    if (type !== 'received') {
+        toHtml = `
+            <span class="message-arrow">→</span>
+            <span class="message-to user-link" onclick="showUserProfile('${escapeHtml(msg.toId)}')">${escapeHtml(msg.toName)}</span>
+         `;
+    }
 
     return `
         <div class="message-card">
             <div class="message-header">
                 <div class="message-users">
                     <span class="message-from user-link" onclick="showUserProfile('${escapeHtml(msg.fromId)}')">${escapeHtml(msg.fromName)}</span>
-                    <span class="message-arrow">→</span>
-                    <span class="message-to user-link" onclick="showUserProfile('${escapeHtml(msg.toId)}')">${escapeHtml(msg.toName)}</span>
+                    ${toHtml}
                 </div>
                 <span class="message-time">${timeString}</span>
             </div>
@@ -910,7 +1013,7 @@ function renderReceivedMessages() {
             </div>
         `;
     } else {
-        elements.receivedMessages.innerHTML = messages.map(createMessageCard).join('');
+        elements.receivedMessages.innerHTML = messages.map(msg => createMessageCard(msg, 'received')).join('');
     }
 
     // バッジを更新
@@ -932,7 +1035,7 @@ function renderSentMessages() {
             </div>
         `;
     } else {
-        elements.sentMessages.innerHTML = messages.map(createMessageCard).join('');
+        elements.sentMessages.innerHTML = messages.map(msg => createMessageCard(msg, 'sent')).join('');
     }
 }
 
@@ -1182,7 +1285,7 @@ function initialize() {
                 // Re-using .section-toggle logic requires the parent class
                 if (elements.searchSectionContent.style.display === 'none') {
                     elements.searchSectionContent.style.display = 'block';
-                    elements.searchSectionToggle.classList.remove('collapsed');
+                    elements.searchSectionContent.classList.remove('collapsed');
                 } else {
                     elements.searchSectionContent.style.display = 'none';
                     elements.searchSectionToggle.classList.add('collapsed');
@@ -1190,6 +1293,7 @@ function initialize() {
             });
         }
 
+        // Global Event Delegation removed - reverted to replaceButtonListener pattern
 
         // Avatar Upload Events
         elements.avatarEditOverlay.addEventListener('click', () => {
@@ -1236,7 +1340,7 @@ function initialize() {
         elements.currentUserBadge.onclick = () => showUserProfile(currentUser.userId);
 
         updateRecipientOptions();
-        switchTab('send');
+        switchTab('timeline');
 
         // 受信メッセージ数を更新
         const receivedCount = getReceivedMessages(currentUser.userId).length;

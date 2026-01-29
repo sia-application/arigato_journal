@@ -33,31 +33,45 @@
         <main class="main-content">
             <!-- タブナビゲーション -->
             <nav class="tab-nav">
-                <button class="tab-btn active" data-tab="send">
-                    <span class="tab-icon">✉️</span>
-                    <span>送る</span>
-                </button>
-                <button class="tab-btn" data-tab="received">
-                    <span class="tab-icon">📬</span>
-                    <span>受信</span>
-                    <span id="received-badge" class="badge hidden">0</span>
-                </button>
-                <button class="tab-btn" data-tab="sent">
-                    <span class="tab-icon">📤</span>
-                    <span>送信済み</span>
+                <button class="tab-btn active" data-tab="timeline">
+                    <span class="tab-icon">🕒</span>
+                    <span>タイムライン</span>
                 </button>
                 <button class="tab-btn" data-tab="friends">
                     <span class="tab-icon">🔍</span>
                     <span>ともだち</span>
                 </button>
-                <button class="tab-btn" data-tab="timeline">
-                    <span class="tab-icon">🕒</span>
-                    <span>タイムライン</span>
+                <button class="tab-btn" data-tab="send">
+                    <span class="tab-icon">✉️</span>
+                    <span>感謝を送る</span>
+                </button>
+                <button class="tab-btn" data-tab="received">
+                    <span class="tab-icon">📬</span>
+                    <span>受信履歴</span>
+                    <span id="received-badge" class="badge hidden">0</span>
+                </button>
+                <button class="tab-btn" data-tab="sent">
+                    <span class="tab-icon">📤</span>
+                    <span>送信履歴</span>
                 </button>
             </nav>
 
-            <!-- 送る タブ -->
-            <div id="tab-send" class="tab-content active">
+            <!-- タイムライン タブ (Default Active) -->
+            <div id="tab-timeline" class="tab-content active">
+                <div class="messages-container">
+                    <h2 class="section-title">タイムライン</h2>
+                    <div id="timeline-list" class="messages-list">
+                        <div class="empty-state">
+                            <span class="empty-icon">🕒</span>
+                            <p>まだタイムラインの投稿はありません</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- 送る タブ (Moved) -->
+            <div id="tab-send" class="tab-content">
                 <div class="card send-card">
                     <h2 class="card-title">ありがとうのメッセージを送る</h2>
                     <form id="send-form">
@@ -104,18 +118,8 @@
                 </div>
             </div>
 
-            <!-- タイムライン タブ -->
-            <div id="tab-timeline" class="tab-content">
-                <div class="messages-container">
-                    <h2 class="section-title">タイムライン</h2>
-                    <div id="timeline-list" class="messages-list">
-                        <div class="empty-state">
-                            <span class="empty-icon">🕒</span>
-                            <p>まだタイムラインの投稿はありません</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <!-- タイムライン タブ (Moved) -->
+            <!-- Removed original position -->
 
             <!-- ともだち タブ -->
             <div id="tab-friends" class="tab-content">
@@ -138,12 +142,12 @@
                 </div>
 
                 <div class="messages-container" style="margin-top: 24px;">
+                    <div id="following-list-toggle" class="section-title section-toggle"
+                        style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                        <span>フォロー</span>
+                        <span class="toggle-icon">▼</span>
+                    </div>
                     <div class="messages-container" style="margin-top: 24px;">
-                        <div id="following-list-toggle" class="section-title section-toggle"
-                            style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-                            <span>フォロー中</span>
-                            <span class="toggle-icon">▼</span>
-                        </div>
                         <div id="following-list" class="messages-list">
                             <!-- フォロー中のユーザーがここに表示されます -->
                             <div class="empty-state">
@@ -152,10 +156,26 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- フォロワーリスト -->
+                    <div class="messages-container" style="margin-top: 24px;">
+                        <div id="follower-list-toggle" class="section-title section-toggle"
+                            style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                            <span>フォロワー</span>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div id="follower-list" class="messages-list">
+                            <!-- フォロワーがここに表示されます -->
+                            <div class="empty-state">
+                                <span class="empty-icon">🥰</span>
+                                <p>まだフォロワーはいません</p>
+                            </div>
+                        </div>
+                    </div>
                     <div class="messages-container" style="margin-top: 24px;">
                         <div id="blocked-list-toggle" class="section-title section-toggle collapsed"
                             style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-                            <span>ブロック中</span>
+                            <span>ブロック</span>
                             <span class="toggle-icon">▼</span>
                         </div>
                         <div id="blocked-list" class="messages-list collapsed">
@@ -191,6 +211,7 @@
                 <h2 id="modal-username">User Name</h2>
                 <input type="text" id="username-edit" class="edit-input hidden" placeholder="ユーザー名" maxlength="20">
                 <p id="modal-userid" class="profile-userid">@userid</p>
+                <p id="modal-follows-you-badge" class="follows-you-badge hidden">フォローされています</p>
 
                 <div class="profile-stats">
                     <div class="stat-item">
