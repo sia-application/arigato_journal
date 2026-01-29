@@ -1761,4 +1761,13 @@ body::after {
         text-align: center;
         padding: 16px;
     }
+
+    /* Prevent zoom on inputs */
+    input,
+    textarea,
+    select,
+    #thread-input,
+    .thread-reply-form textarea {
+        font-size: 16px !important;
+    }
 }
