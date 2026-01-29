@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ありがとうジャーナル - メイン</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <!-- メイン画面 -->
+    <div id="main-screen" class="screen active">
+        <!-- ヘッダー -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <span class="header-logo">🙏</span>
+                    <h1>ありがとうジャーナル</h1>
+                </div>
+                <div class="header-right">
+                    <span id="current-user" class="user-badge"></span>
+                    <button id="logout-btn" class="btn btn-ghost">ログアウト</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main class="main-content">
+            <!-- タブナビゲーション -->
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="send">
+                    <span class="tab-icon">✉️</span>
+                    <span>送る</span>
+                </button>
+                <button class="tab-btn" data-tab="received">
+                    <span class="tab-icon">📬</span>
+                    <span>受信</span>
+                    <span id="received-badge" class="badge hidden">0</span>
+                </button>
+                <button class="tab-btn" data-tab="sent">
+                    <span class="tab-icon">📤</span>
+                    <span>送信済み</span>
+                </button>
+                <button class="tab-btn" data-tab="timeline">
+                    <span class="tab-icon">🌐</span>
+                    <span>タイムライン</span>
+                </button>
+            </nav>
+
+            <!-- 送る タブ -->
+            <div id="tab-send" class="tab-content active">
+                <div class="card send-card">
+                    <h2 class="card-title">感謝を送る</h2>
+                    <form id="send-form">
+                        <div class="input-group">
+                            <label for="recipient">宛先</label>
+                            <select id="recipient" required>
+                                <option value="">送りたい相手を選択</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="message">メッセージ</label>
+                            <textarea id="message" rows="4" placeholder="感謝の気持ちを書いてみましょう..." required></textarea>
+                        </div>
+                        <div class="input-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="is-public" checked>
+                                <span class="checkmark"></span>
+                                <span>タイムラインに公開する</span>
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-large">
+                            <span>💖 感謝を送る</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 受信 タブ -->
+            <div id="tab-received" class="tab-content">
+                <div class="messages-container">
+                    <h2 class="section-title">受け取った感謝</h2>
+                    <div id="received-messages" class="messages-list">
+                        <div class="empty-state">
+                            <span class="empty-icon">📭</span>
+                            <p>まだ感謝のメッセージはありません</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 送信済み タブ -->
+            <div id="tab-sent" class="tab-content">
+                <div class="messages-container">
+                    <h2 class="section-title">送った感謝</h2>
+                    <div id="sent-messages" class="messages-list">
+                        <div class="empty-state">
+                            <span class="empty-icon">✨</span>
+                            <p>まだ感謝を送っていません</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- タイムライン タブ -->
+            <div id="tab-timeline" class="tab-content">
+                <div class="messages-container">
+                    <h2 class="section-title">みんなの感謝</h2>
+                    <div id="timeline-messages" class="messages-list">
+                        <div class="empty-state">
+                            <span class="empty-icon">🌸</span>
+                            <p>まだ公開されたメッセージはありません</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast" class="toast hidden">
+        <span class="toast-icon">✓</span>
+        <span class="toast-message"></span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

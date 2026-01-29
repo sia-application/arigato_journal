@@ -18,13 +18,13 @@ function initializeData() {
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
         // デモ用の初期ユーザー
         const initialUsers = [
-            { id: 'user1', name: 'さくら', createdAt: Date.now() },
-            { id: 'user2', name: 'たける', createdAt: Date.now() },
-            { id: 'user3', name: 'あおい', createdAt: Date.now() }
+            { id: 'user1', name: 'さくら', password: 'password', createdAt: Date.now() },
+            { id: 'user2', name: 'たける', password: 'password', createdAt: Date.now() },
+            { id: 'user3', name: 'あおい', password: 'password', createdAt: Date.now() }
         ];
         localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
     }
-    
+
     if (!localStorage.getItem(STORAGE_KEYS.MESSAGES)) {
         // デモ用の初期メッセージ
         const initialMessages = [
@@ -66,11 +66,12 @@ function findUser(name) {
     return getUsers().find(u => u.name === name);
 }
 
-function createUser(name) {
+function createUser(name, password) {
     const users = getUsers();
     const newUser = {
         id: 'user_' + Date.now(),
         name: name,
+        password: password,
         createdAt: Date.now()
     };
     users.push(newUser);
@@ -103,7 +104,7 @@ function saveMessages(messages) {
 function sendMessage(toId, toName, message, isPublic) {
     const currentUser = getCurrentUser();
     if (!currentUser) return null;
-    
+
     const messages = getMessages();
     const newMessage = {
         id: 'msg_' + Date.now(),
@@ -141,12 +142,30 @@ const elements = {};
 function initializeElements() {
     elements.loginScreen = document.getElementById('login-screen');
     elements.mainScreen = document.getElementById('main-screen');
-    elements.loginForm = document.getElementById('login-form');
-    elements.usernameInput = document.getElementById('username');
-    elements.currentUserBadge = document.getElementById('current-user');
-    elements.logoutBtn = document.getElementById('logout-btn');
-    elements.tabBtns = document.querySelectorAll('.tab-btn');
-    elements.tabContents = document.querySelectorAll('.tab-content');
+
+    // ページによって、存在する要素だけ取得
+    if (elements.loginScreen) {
+        elements.loginForm = document.getElementById('login-form');
+        elements.usernameInput = document.getElementById('username');
+        elements.passwordInput = document.getElementById('password');
+    }
+
+    if (elements.mainScreen) {
+        elements.currentUserBadge = document.getElementById('current-user');
+        elements.logoutBtn = document.getElementById('logout-btn');
+        elements.tabBtns = document.querySelectorAll('.tab-btn');
+        elements.tabContents = document.querySelectorAll('.tab-content');
+        elements.sendForm = document.getElementById('send-form');
+        elements.recipientSelect = document.getElementById('recipient');
+        elements.messageInput = document.getElementById('message');
+        elements.isPublicCheckbox = document.getElementById('is-public');
+        elements.receivedMessages = document.getElementById('received-messages');
+        elements.sentMessages = document.getElementById('sent-messages');
+        elements.timelineMessages = document.getElementById('timeline-messages');
+        elements.receivedBadge = document.getElementById('received-badge');
+    }
+
+    elements.toast = document.getElementById('toast');
     elements.sendForm = document.getElementById('send-form');
     elements.recipientSelect = document.getElementById('recipient');
     elements.messageInput = document.getElementById('message');
@@ -174,7 +193,7 @@ function switchTab(tabName) {
     elements.tabContents.forEach(content => {
         content.classList.toggle('active', content.id === `tab-${tabName}`);
     });
-    
+
     // タブ切り替え時にコンテンツを更新
     if (tabName === 'received') {
         renderReceivedMessages();
@@ -189,7 +208,7 @@ function switchTab(tabName) {
 function updateRecipientOptions() {
     const currentUser = getCurrentUser();
     const users = getUsers().filter(u => u.id !== currentUser?.id);
-    
+
     elements.recipientSelect.innerHTML = '<option value="">送りたい相手を選択</option>';
     users.forEach(user => {
         const option = document.createElement('option');
@@ -204,7 +223,7 @@ function updateRecipientOptions() {
 function createMessageCard(msg) {
     const date = new Date(msg.createdAt);
     const timeString = formatDate(date);
-    
+
     return `
         <div class="message-card">
             <div class="message-header">
@@ -227,9 +246,9 @@ function createMessageCard(msg) {
 function renderReceivedMessages() {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
-    
+
     const messages = getReceivedMessages(currentUser.id);
-    
+
     if (messages.length === 0) {
         elements.receivedMessages.innerHTML = `
             <div class="empty-state">
@@ -240,7 +259,7 @@ function renderReceivedMessages() {
     } else {
         elements.receivedMessages.innerHTML = messages.map(createMessageCard).join('');
     }
-    
+
     // バッジを更新
     updateReceivedBadge(messages.length);
 }
@@ -249,9 +268,9 @@ function renderReceivedMessages() {
 function renderSentMessages() {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
-    
+
     const messages = getSentMessages(currentUser.id);
-    
+
     if (messages.length === 0) {
         elements.sentMessages.innerHTML = `
             <div class="empty-state">
@@ -267,7 +286,7 @@ function renderSentMessages() {
 // タイムラインを表示
 function renderTimelineMessages() {
     const messages = getPublicMessages();
-    
+
     if (messages.length === 0) {
         elements.timelineMessages.innerHTML = `
             <div class="empty-state">
@@ -296,7 +315,7 @@ function showToast(message) {
     toastMessage.textContent = message;
     elements.toast.classList.remove('hidden');
     elements.toast.classList.add('show');
-    
+
     setTimeout(() => {
         elements.toast.classList.remove('show');
         setTimeout(() => {
@@ -318,7 +337,7 @@ function escapeHtml(text) {
 function formatDate(date) {
     const now = new Date();
     const diff = now - date;
-    
+
     if (diff < 60000) { // 1分未満
         return 'たった今';
     } else if (diff < 3600000) { // 1時間未満
@@ -343,50 +362,65 @@ function formatDate(date) {
 function handleLogin(e) {
     e.preventDefault();
     const username = elements.usernameInput.value.trim();
-    
-    if (!username) return;
-    
+    const password = elements.passwordInput.value.trim();
+
+    if (!username || !password) {
+        showToast('ユーザー名とパスワードを入力してください');
+        return;
+    }
+
     // 既存ユーザーを検索、なければ作成
     let user = findUser(username);
     if (!user) {
-        user = createUser(username);
+        user = createUser(username, password);
         showToast(`ようこそ、${username}さん！`);
     } else {
+        // パスワード確認
+        if (user.password && user.password !== password) {
+            showToast('パスワードが間違っています');
+            return;
+        }
+        // 古いユーザーデータでパスワードがない場合の互換性対応（今回は簡易的にスルーまたは保存）
+        if (!user.password) {
+            user.password = password; // 初回移行として保存
+            const users = getUsers();
+            const index = users.findIndex(u => u.id === user.id);
+            if (index !== -1) {
+                users[index] = user;
+                saveUsers(users);
+            }
+        }
+
         showToast(`おかえりなさい、${username}さん！`);
     }
-    
+
     setCurrentUser(user);
-    
-    // メイン画面に切り替え
-    showScreen('main-screen');
-    elements.currentUserBadge.textContent = user.name;
-    updateRecipientOptions();
-    switchTab('send');
-    
-    // 受信メッセージ数を更新
-    const receivedCount = getReceivedMessages(user.id).length;
-    updateReceivedBadge(receivedCount);
+
+    // ページ遷移
+    showToast(`ようこそ、${username}さん！`);
+    setTimeout(() => {
+        window.location.href = 'top.html';
+    }, 1000);
 }
 
 function handleLogout() {
     clearCurrentUser();
-    elements.usernameInput.value = '';
-    showScreen('login-screen');
+    window.location.href = 'index.html';
 }
 
 function handleSendMessage(e) {
     e.preventDefault();
-    
+
     const recipientId = elements.recipientSelect.value;
     const recipientOption = elements.recipientSelect.options[elements.recipientSelect.selectedIndex];
     const recipientName = recipientOption.dataset.name;
     const message = elements.messageInput.value.trim();
     const isPublic = elements.isPublicCheckbox.checked;
-    
+
     if (!recipientId || !message) return;
-    
+
     const newMessage = sendMessage(recipientId, recipientName, message, isPublic);
-    
+
     if (newMessage) {
         showToast(`${recipientName}さんに感謝を送りました！`);
         elements.messageInput.value = '';
@@ -408,28 +442,46 @@ function handleTabClick(e) {
 function initialize() {
     initializeData();
     initializeElements();
-    
-    // イベントリスナーを設定
-    elements.loginForm.addEventListener('submit', handleLogin);
-    elements.logoutBtn.addEventListener('click', handleLogout);
-    elements.sendForm.addEventListener('submit', handleSendMessage);
-    elements.tabBtns.forEach(btn => {
-        btn.addEventListener('click', handleTabClick);
-    });
-    
-    // ログイン状態を確認
+
+    // イベントリスナーを設定（存在する要素のみ）
+    if (elements.loginForm) {
+        elements.loginForm.addEventListener('submit', handleLogin);
+    }
+
+    if (elements.mainScreen) {
+        elements.logoutBtn.addEventListener('click', handleLogout);
+        elements.sendForm.addEventListener('submit', handleSendMessage);
+        elements.tabBtns.forEach(btn => {
+            btn.addEventListener('click', handleTabClick);
+        });
+    }
+
+    // ログイン状態を確認とリダイレクト
     const currentUser = getCurrentUser();
-    if (currentUser) {
-        showScreen('main-screen');
+
+    // ログイン画面での処理
+    if (document.getElementById('login-screen')) {
+        if (currentUser) {
+            // ログイン済みならトップへ
+            window.location.href = 'top.html';
+        }
+    }
+
+    // メイン画面での処理
+    if (document.getElementById('main-screen')) {
+        if (!currentUser) {
+            // 未ログインならログイン画面へ
+            window.location.href = 'index.html';
+            return;
+        }
+
         elements.currentUserBadge.textContent = currentUser.name;
         updateRecipientOptions();
         switchTab('send');
-        
+
         // 受信メッセージ数を更新
         const receivedCount = getReceivedMessages(currentUser.id).length;
         updateReceivedBadge(receivedCount);
-    } else {
-        showScreen('login-screen');
     }
 }
 
