@@ -165,9 +165,16 @@ body::after {
 }
 
 .logo {
-    font-size: 64px;
     margin-bottom: 16px;
     animation: bounce 2s infinite;
+}
+
+.logo-img {
+    height: 150px;
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
 }
 
 @keyframes bounce {
@@ -412,7 +419,14 @@ body::after {
 }
 
 .header-logo {
-    font-size: 28px;
+    display: flex;
+    align-items: center;
+}
+
+.header-logo-img {
+    height: 40px;
+    width: auto;
+    object-fit: contain;
 }
 
 .header-left h1 {
@@ -570,7 +584,7 @@ body::after {
 }
 
 .card-title::before {
-    content: '💝';
+    content: '🔍';
 }
 
 .send-card form {
