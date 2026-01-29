@@ -303,14 +303,18 @@ function initializeElements() {
         elements.searchUserIdInput = document.getElementById('search-userid');
         elements.searchResult = document.getElementById('search-result');
         elements.followingList = document.getElementById('following-list');
-        elements.searchResult = document.getElementById('search-result');
-        elements.followingList = document.getElementById('following-list');
         elements.blockedList = document.getElementById('blocked-list');
         elements.blockedListToggle = document.getElementById('blocked-list-toggle');
         elements.followerList = document.getElementById('follower-list');
         elements.followerListToggle = document.getElementById('follower-list-toggle');
 
         elements.followingListToggle = document.getElementById('following-list-toggle');
+
+        // New Dropdown Elements
+        elements.listTypeSelect = document.getElementById('list-type-select');
+        elements.followingListWrapper = document.getElementById('following-list-wrapper');
+        elements.followerListWrapper = document.getElementById('follower-list-wrapper');
+        elements.blockedListWrapper = document.getElementById('blocked-list-wrapper');
 
         elements.searchSectionToggle = document.getElementById('search-section-toggle');
         elements.searchSectionContent = document.getElementById('search-section-content');
@@ -1267,11 +1271,23 @@ function initialize() {
             });
         }
 
-        // Following List Toggle
-        if (elements.followingListToggle) {
-            elements.followingListToggle.addEventListener('click', () => {
-                elements.followingListToggle.classList.toggle('collapsed');
-                elements.followingList.classList.toggle('collapsed');
+        // List Type Select Logic
+        if (elements.listTypeSelect) {
+            elements.listTypeSelect.addEventListener('change', (e) => {
+                const selected = e.target.value;
+                if (selected === 'following') {
+                    elements.followingListWrapper.classList.remove('hidden');
+                    elements.followerListWrapper.classList.add('hidden');
+                    elements.blockedListWrapper.classList.add('hidden');
+                } else if (selected === 'followers') {
+                    elements.followingListWrapper.classList.add('hidden');
+                    elements.followerListWrapper.classList.remove('hidden');
+                    elements.blockedListWrapper.classList.add('hidden');
+                } else if (selected === 'blocked') {
+                    elements.followingListWrapper.classList.add('hidden');
+                    elements.followerListWrapper.classList.add('hidden');
+                    elements.blockedListWrapper.classList.remove('hidden');
+                }
             });
         }
 
