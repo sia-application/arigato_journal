@@ -120,38 +120,53 @@
             <!-- ともだち タブ -->
             <div id="tab-friends" class="tab-content">
                 <div class="card">
-                    <h2 class="card-title">ともだちを探す</h2>
-                    <div class="search-container">
-                        <div class="input-group search-group">
-                            <input type="text" id="search-userid" placeholder="ユーザーIDを入力">
-                        </div>
+                    <div id="search-section-toggle"
+                        style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+                        <h2 class="card-title" style="margin-bottom: 0;">ともだちを探す</h2>
+                        <span class="toggle-icon">▼</span>
                     </div>
-                    <div id="search-result" class="search-result">
-                        <!-- 検索結果がここに表示されます -->
+                    <div id="search-section-content">
+                        <div class="search-container">
+                            <div class="input-group search-group">
+                                <input type="text" id="search-userid" placeholder="ユーザーIDを入力">
+                            </div>
+                        </div>
+                        <div id="search-result" class="search-result">
+                            <!-- 検索結果がここに表示されます -->
+                        </div>
                     </div>
                 </div>
 
                 <div class="messages-container" style="margin-top: 24px;">
-                    <h2 class="section-title">フォロー中</h2>
-                    <div id="following-list" class="messages-list">
-                        <!-- フォロー中のユーザーがここに表示されます -->
-                        <div class="empty-state">
-                            <span class="empty-icon">👥</span>
-                            <p>まだフォローしている人はいません</p>
+                    <div class="messages-container" style="margin-top: 24px;">
+                        <div id="following-list-toggle" class="section-title section-toggle"
+                            style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                            <span>フォロー中</span>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div id="following-list" class="messages-list">
+                            <!-- フォロー中のユーザーがここに表示されます -->
+                            <div class="empty-state">
+                                <span class="empty-icon">👥</span>
+                                <p>まだフォローしている人はいません</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="messages-container" style="margin-top: 24px;">
+                        <div id="blocked-list-toggle" class="section-title section-toggle collapsed"
+                            style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                            <span>ブロック中</span>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div id="blocked-list" class="messages-list collapsed">
+                            <!-- ブロック中のユーザーがここに表示されます -->
+                            <div class="empty-state">
+                                <span class="empty-icon">🚫</span>
+                                <p>ブロックしている人はいません</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="messages-container" style="margin-top: 24px;">
-                    <h2 class="section-title">ブロック中</h2>
-                    <div id="blocked-list" class="messages-list">
-                        <!-- ブロック中のユーザーがここに表示されます -->
-                        <div class="empty-state">
-                            <span class="empty-icon">🚫</span>
-                            <p>ブロックしている人はいません</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
         </main>
     </div>

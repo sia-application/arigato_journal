@@ -306,6 +306,12 @@ function initializeElements() {
         elements.searchResult = document.getElementById('search-result');
         elements.followingList = document.getElementById('following-list');
         elements.blockedList = document.getElementById('blocked-list');
+        elements.blockedListToggle = document.getElementById('blocked-list-toggle');
+
+        elements.followingListToggle = document.getElementById('following-list-toggle');
+
+        elements.searchSectionToggle = document.getElementById('search-section-toggle');
+        elements.searchSectionContent = document.getElementById('search-section-content');
 
         // Profile Modal
         elements.profileModal = document.getElementById('profile-modal');
@@ -1146,8 +1152,43 @@ function initialize() {
         });
         elements.modalEditBtn.addEventListener('click', enableEditProfile);
         elements.modalSaveBtn.addEventListener('click', saveProfile);
+        elements.modalEditBtn.addEventListener('click', enableEditProfile);
         elements.modalSaveBtn.addEventListener('click', saveProfile);
         elements.modalCancelBtn.addEventListener('click', cancelEditProfile);
+
+        // Blocked List Toggle
+        if (elements.blockedListToggle) {
+            elements.blockedListToggle.addEventListener('click', () => {
+                elements.blockedListToggle.classList.toggle('collapsed');
+                elements.blockedList.classList.toggle('collapsed');
+            });
+        }
+
+        // Following List Toggle
+        if (elements.followingListToggle) {
+            elements.followingListToggle.addEventListener('click', () => {
+                elements.followingListToggle.classList.toggle('collapsed');
+                elements.followingList.classList.toggle('collapsed');
+            });
+        }
+
+        // Search Section Toggle
+        if (elements.searchSectionToggle) {
+            elements.searchSectionToggle.addEventListener('click', () => {
+                elements.searchSectionToggle.classList.toggle('collapsed');
+                // For search section, we might need a utility class or specific style for collapsing
+                // borrowing .collapsed logic from styles.css which hides display: none
+                elements.searchSectionToggle.classList.toggle('collapsed-rotate'); // Rotate icon specific? Or generic?
+                // Re-using .section-toggle logic requires the parent class
+                if (elements.searchSectionContent.style.display === 'none') {
+                    elements.searchSectionContent.style.display = 'block';
+                    elements.searchSectionToggle.classList.remove('collapsed');
+                } else {
+                    elements.searchSectionContent.style.display = 'none';
+                    elements.searchSectionToggle.classList.add('collapsed');
+                }
+            });
+        }
 
 
         // Avatar Upload Events

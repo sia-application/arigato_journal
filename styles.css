@@ -560,6 +560,20 @@ body::after {
     border-bottom: 2px solid var(--pink-200);
 }
 
+.section-toggle .toggle-icon {
+    transition: transform 0.3s ease;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.section-toggle.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.messages-list.collapsed {
+    display: none;
+}
+
 .messages-list {
     display: flex;
     flex-direction: column;
