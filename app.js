@@ -408,10 +408,6 @@ function initializeElements() {
         elements.sendForm = document.getElementById('send-form');
         elements.recipientSelect = document.getElementById('recipient');
         elements.messageInput = document.getElementById('message');
-        elements.receivedMessages = document.getElementById('received-messages');
-        elements.sentMessages = document.getElementById('sent-messages');
-        elements.receivedMessages = document.getElementById('received-messages');
-        elements.sentMessages = document.getElementById('sent-messages');
         elements.timelineList = document.getElementById('timeline-list');
         elements.receivedBadge = document.getElementById('received-badge');
 
@@ -420,6 +416,13 @@ function initializeElements() {
         elements.receivedMessagesDetail = document.getElementById('received-messages-detail');
         elements.detailSenderName = document.getElementById('detail-sender-name');
         elements.detailMessagesList = document.getElementById('detail-messages-list');
+
+        // Sent Tab Grouping Elements
+        elements.sentRecipientsList = document.getElementById('sent-recipients-list');
+        elements.sentMessagesDetail = document.getElementById('sent-messages-detail');
+        elements.detailRecipientName = document.getElementById('detail-recipient-name');
+        elements.detailSentMessagesList = document.getElementById('detail-sent-messages-list');
+
 
         // Search & Friends
         elements.searchUserIdInput = document.getElementById('search-userid');
@@ -1205,15 +1208,23 @@ function renderReceivedMessages() {
             if (!senderGroups[msg.fromId]) {
                 senderGroups[msg.fromId] = {
                     name: msg.fromName,
-                    messages: []
+                    messages: [],
+                    latest: 0
                 };
             }
             senderGroups[msg.fromId].messages.push(msg);
+            if (msg.createdAt > senderGroups[msg.fromId].latest) {
+                senderGroups[msg.fromId].latest = msg.createdAt;
+            }
         });
 
+        // Convert to array and sort by latest message time descending
+        const sortedSenders = Object.keys(senderGroups).map(fromId => {
+            return { id: fromId, ...senderGroups[fromId] };
+        }).sort((a, b) => b.latest - a.latest);
+
         // Create Sender List HTML
-        const sendersHtml = Object.keys(senderGroups).map(fromId => {
-            const group = senderGroups[fromId];
+        const sendersHtml = sortedSenders.map(group => {
             const count = group.messages.length;
 
             // Unread Logic
@@ -1222,7 +1233,7 @@ function renderReceivedMessages() {
             const unreadStyle = hasUnread ? 'font-weight: bold; color: var(--text-primary);' : 'color: var(--text-secondary);';
 
             return `
-            <div class="user-card" onclick="showReceivedDetail('${fromId}')" style="cursor: pointer;">
+            <div class="user-card" onclick="showReceivedDetail('${group.id}')" style="cursor: pointer;">
                 <div class="user-info">
                     <span class="user-name">${escapeHtml(group.name)} ${unreadIndicator}</span>
                     <span class="user-id" style="font-size: 12px; ${unreadStyle}">メッセージ ${count}件</span>
@@ -1299,16 +1310,74 @@ function renderSentMessages() {
     const messages = getSentMessages(currentUser.userId);
 
     if (messages.length === 0) {
-        elements.sentMessages.innerHTML = `
+        elements.sentRecipientsList.innerHTML = `
             <div class="empty-state">
                 <span class="empty-icon">✨</span>
                 <p>まだありがとうを送っていません</p>
             </div>
         `;
+        elements.sentMessagesDetail.classList.add('hidden');
+        elements.sentRecipientsList.classList.remove('hidden');
     } else {
-        elements.sentMessages.innerHTML = messages.map(msg => createMessageCard(msg, 'sent')).join('');
+        // Group by Recipient
+        const groups = {};
+        messages.forEach(msg => {
+            if (!groups[msg.toId]) {
+                groups[msg.toId] = {
+                    name: msg.toName,
+                    messages: [],
+                    latest: 0
+                };
+            }
+            groups[msg.toId].messages.push(msg);
+            if (msg.createdAt > groups[msg.toId].latest) {
+                groups[msg.toId].latest = msg.createdAt;
+            }
+        });
+
+        // Convert to array and sort by latest message time descending
+        const sortedRecipients = Object.keys(groups).map(toId => {
+            return { id: toId, ...groups[toId] };
+        }).sort((a, b) => b.latest - a.latest);
+
+        const html = sortedRecipients.map(recipient => {
+            return `
+            <div class="user-card" onclick="showSentDetail('${recipient.id}')" style="cursor: pointer;">
+                <div class="user-info">
+                    <span class="user-name">${escapeHtml(recipient.name)}</span>
+                    <span class="user-id" style="font-size: 12px; color: var(--text-secondary);">メッセージ ${recipient.messages.length}件</span>
+                </div>
+                <div style="font-size: 20px; color: var(--blue-400);">
+                    →
+                </div>
+            </div>
+            `;
+        }).join('');
+
+        elements.sentRecipientsList.innerHTML = html;
+        elements.sentRecipientsList.classList.remove('hidden');
+        elements.sentMessagesDetail.classList.add('hidden');
     }
 }
+
+// Show Detail View for specific recipient
+window.showSentDetail = function (toId) {
+    const currentUser = getCurrentUser();
+    const messages = getSentMessages(currentUser.userId).filter(m => m.toId === toId);
+
+    if (messages.length > 0) {
+        elements.detailRecipientName.textContent = messages[0].toName + 'さんへのメッセージ';
+        elements.detailSentMessagesList.innerHTML = messages.map(msg => createMessageCard(msg, 'sent')).join('');
+
+        elements.sentRecipientsList.classList.add('hidden');
+        elements.sentMessagesDetail.classList.remove('hidden');
+    }
+};
+
+window.backToSentList = function () {
+    elements.sentRecipientsList.classList.remove('hidden');
+    elements.sentMessagesDetail.classList.add('hidden');
+};
 
 // タイムラインを表示
 function renderTimeline() {

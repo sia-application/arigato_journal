@@ -140,10 +140,25 @@
             <div id="tab-sent" class="tab-content">
                 <div class="messages-container">
                     <h2 class="section-title">送ったありがとう</h2>
-                    <div id="sent-messages" class="messages-list">
+
+                    <!-- Recipient List View -->
+                    <div id="sent-recipients-list" class="messages-list">
                         <div class="empty-state">
                             <span class="empty-icon">✨</span>
                             <p>まだありがとうを送っていません</p>
+                        </div>
+                    </div>
+
+                    <!-- Detail View (Hidden by default) -->
+                    <div id="sent-messages-detail" class="hidden">
+                        <div class="detail-header"
+                            style="display: flex; align-items: center; margin-bottom: 16px; gap: 12px;">
+                            <button onclick="backToSentList()"
+                                style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--blue-500);">←</button>
+                            <h3 id="detail-recipient-name" style="margin: 0; font-size: 18px;">Recipient Name</h3>
+                        </div>
+                        <div id="detail-sent-messages-list" class="messages-list">
+                            <!-- Messages to specific recipient -->
                         </div>
                     </div>
                 </div>
