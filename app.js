@@ -126,6 +126,26 @@ function getSentMessages(userId) {
         .filter(m => m.fromId === userId);
 }
 
+// メッセージを削除
+function deleteMessage(messageId) {
+    if (!confirm('このメッセージを削除してもよろしいですか？')) return;
+
+    let messages = getMessages();
+    messages = messages.filter(m => m.id !== messageId);
+    saveMessages(messages);
+
+    showToast('メッセージを削除しました');
+
+    // UIを更新
+    renderTimeline();
+    renderSentMessages();
+    renderReceivedMessages();
+    if (currentThreadContext) {
+        renderThreadMessages();
+    }
+}
+
+
 // Thread Logic
 let currentThreadContext = null; // { rootId, otherUserId, otherUserName }
 
@@ -1144,9 +1164,14 @@ function createMessageCard(msg, type = 'sent') {
         `;
     } else {
         actionsHtml = `
-            <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
-                💬 スレッド
-            </button>
+            <div class="message-actions-sent">
+                <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
+                    💬 スレッド
+                </button>
+                <button class="delete-btn" title="削除" onclick="deleteMessage('${escapeHtml(msg.id)}')">
+                    🗑️
+                </button>
+            </div>
         `;
     }
 
