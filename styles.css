@@ -1038,6 +1038,26 @@ body::after {
     }
 }
 
+/* Follow Action Button (Pink Outline, Pill Shape) */
+.btn-follow-action {
+    background: transparent;
+    color: var(--pink-600);
+    border: 1px solid var(--pink-400);
+    border-radius: 50px;
+    font-weight: 600;
+    padding: 8px 24px;
+    /* Adjust padding for pill shape */
+    transition: all 0.2s ease;
+}
+
+.btn-follow-action:hover {
+    background: var(--pink-50);
+    color: var(--pink-700);
+    border-color: var(--pink-500);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(236, 72, 153, 0.1);
+}
+
 /* Blocked Action (Disabled Follow) */
 .blocked-action {
     background: var(--gray-200) !important;
@@ -1052,6 +1072,10 @@ body::after {
     /* Changed from !important to standard cascade if possible, but keeping for safety if needed */
     color: white;
     border: 1px solid #ef4444;
+    border-radius: 50px;
+    /* Pill shape */
+    padding: 8px 24px;
+    /* Match padding */
 }
 
 .btn-blocked:hover {
@@ -1064,6 +1088,10 @@ body::after {
     color: white;
     border: 1px solid #ef4444;
     cursor: pointer;
+    border-radius: 50px;
+    /* Pill shape */
+    padding: 8px 24px;
+    /* Match padding */
 }
 
 /* Following Button Style (Default/List - Filled) */
@@ -1078,17 +1106,21 @@ body::after {
     color: var(--pink-700);
 }
 
-/* Modal Specific Following Button (Outline - Nice) */
+/* Modal Specific Following Button (Pink Filled - Pill Shape) */
 #modal-action-btn.following {
-    background: transparent;
-    color: var(--text-secondary);
-    border: 1px solid var(--gray-400);
+    background: var(--pink-100);
+    color: var(--pink-600);
+    border: 1px solid transparent;
+    border-radius: 50px;
+    /* Pill shape */
+    padding: 8px 24px;
+    /* Match padding */
+    font-weight: 600;
 }
 
 #modal-action-btn.following:hover {
-    border-color: var(--gray-600);
-    color: var(--text-primary);
-    background: var(--gray-100);
+    background: var(--pink-200);
+    color: var(--pink-700);
 }
 
 /* Edit Profile Styles */

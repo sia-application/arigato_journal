@@ -651,7 +651,7 @@ function updateFollowButton(userId) {
         elements.modalActionBtn.textContent = 'フォローできません';
         elements.modalActionBtn.disabled = true;
         elements.modalActionBtn.classList.add('blocked-action');
-        elements.modalActionBtn.classList.remove('following', 'btn-primary');
+        elements.modalActionBtn.classList.remove('following', 'btn-primary', 'btn-follow-action');
     } else {
         elements.modalActionBtn.disabled = false;
         elements.modalActionBtn.textContent = isFollowed ? 'フォロー中' : 'フォローする';
@@ -659,10 +659,11 @@ function updateFollowButton(userId) {
 
         if (isFollowed) {
             elements.modalActionBtn.classList.add('following');
-            elements.modalActionBtn.classList.remove('btn-primary');
+            elements.modalActionBtn.classList.remove('btn-primary', 'btn-follow-action');
         } else {
             elements.modalActionBtn.classList.remove('following');
-            elements.modalActionBtn.classList.add('btn-primary');
+            elements.modalActionBtn.classList.add('btn-follow-action');
+            elements.modalActionBtn.classList.remove('btn-primary');
         }
     }
 }
