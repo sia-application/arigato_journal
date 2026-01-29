@@ -234,9 +234,8 @@ function renderThreadMessages() {
     }
 
     threadMessages.forEach(msg => {
-        // Reuse createMessageCard logic but maybe simplified?
-        // Using 'timeline' type for now to show standard card
-        listContainer.innerHTML += createMessageCard(msg, 'timeline');
+        // Reuse createMessageCard logic but with 'thread' type for simplification
+        listContainer.innerHTML += createMessageCard(msg, 'thread');
     });
 
     // Scroll to bottom
@@ -1177,7 +1176,7 @@ function createMessageCard(msg, type = 'sent') {
     // 返信ボタン
     let actionsHtml = '';
 
-    if (type !== 'received') {
+    if (type !== 'received' && type !== 'thread') {
         toHtml = `
             <span class="message-arrow">→</span>
             <span class="message-to user-link" onclick="showUserProfile('${escapeHtml(msg.toId)}')">${escapeHtml(msg.toName)}</span>
@@ -1185,18 +1184,29 @@ function createMessageCard(msg, type = 'sent') {
     }
 
     // 自分のメッセージ以外で、かつタイムラインか受信ボックスの場合に返信ボタンを表示
-    if (!isOwnMessage) {
-        actionsHtml = `
-            <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
-                💬 スレッド
-            </button>
-        `;
-    } else {
-        actionsHtml = `
-            <div class="message-actions-sent">
+    if (type !== 'thread') {
+        if (!isOwnMessage) {
+            actionsHtml = `
                 <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
                     💬 スレッド
                 </button>
+            `;
+        } else {
+            actionsHtml = `
+                <div class="message-actions-sent">
+                    <button class="reply-btn" onclick="openThread('${escapeHtml(msg.id)}')">
+                        💬 スレッド
+                    </button>
+                    <button class="delete-btn" title="削除" onclick="deleteMessage('${escapeHtml(msg.id)}')">
+                        🗑️
+                    </button>
+                </div>
+            `;
+        }
+    } else if (isOwnMessage) {
+        // スレッド内でも自分自身のメッセージは削除可能にする
+        actionsHtml = `
+            <div class="message-actions-sent">
                 <button class="delete-btn" title="削除" onclick="deleteMessage('${escapeHtml(msg.id)}')">
                     🗑️
                 </button>
@@ -1206,7 +1216,7 @@ function createMessageCard(msg, type = 'sent') {
 
     // Reply Context Rendering
     let replyContextHtml = '';
-    if (msg.replyTo) {
+    if (msg.replyTo && type !== 'thread') {
         replyContextHtml = `
             <div class="reply-context">
                 <span class="reply-link-name">↩ Replying to ${escapeHtml(msg.replyTo.name)}</span>

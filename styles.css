@@ -615,7 +615,7 @@ body::after {
     border-radius: var(--radius-lg);
     padding: 24px;
     box-shadow: var(--shadow-sm);
-    border: 1px solid var(--pink-100);
+    border: 1px solid var(--pink-200);
     transition: var(--transition-normal);
     animation: fadeInUp 0.4s ease;
 }
@@ -777,7 +777,8 @@ body::after {
     color: var(--text-secondary);
     margin: 0;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -1085,11 +1086,14 @@ body::after {
 .thread-messages-list .message-card {
     margin-bottom: 0;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    align-self: flex-start;
+    max-width: 85%;
+    width: fit-content;
 }
 
 .thread-messages-list .message-card.own-message {
     align-self: flex-end;
-    /* Align own messages to right visually if needed */
+    /* Align own messages to right visually */
     border-color: var(--blue-200);
 }
 
