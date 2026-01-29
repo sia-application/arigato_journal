@@ -1158,9 +1158,15 @@ function closeModal() {
     }, 300);
 }
 
+// メッセージの最新アクティビティ時間を取得
+function getLatestThreadTime(rootId, allMessages) {
+    const threadMsgs = allMessages.filter(m => m.rootId === rootId || m.id === rootId);
+    if (threadMsgs.length === 0) return 0;
+    return Math.max(...threadMsgs.map(m => m.createdAt));
+}
+
 // メッセージカードのHTML生成
-// メッセージカードのHTML生成
-function createMessageCard(msg, type = 'sent') {
+function createMessageCard(msg, type = 'sent', latestTime = null) {
     const timeString = formatDate(msg.createdAt);
     const currentUser = getCurrentUser();
     const isOwnMessage = currentUser && msg.fromId === currentUser.userId;
@@ -1229,6 +1235,12 @@ function createMessageCard(msg, type = 'sent') {
     const unreadClass = (type === 'received' && !msg.isRead) ? 'unread' : '';
     const unreadBadge = (type === 'received' && !msg.isRead) ? '<span class="unread-badge">NEW</span>' : '';
 
+    // 最新アクティビティ表示
+    let latestActivityHtml = '';
+    if (latestTime && type !== 'thread') {
+        latestActivityHtml = `<span class="message-latest-activity">最新: ${formatDate(latestTime)}</span>`;
+    }
+
     return `
         <div class="message-card ${unreadClass} ${ownMessageClass}">
             <div class="message-header">
@@ -1238,6 +1250,7 @@ function createMessageCard(msg, type = 'sent') {
                     ${toHtml}
                     ${actionsHtml}
                 </div>
+                ${latestActivityHtml}
             </div>
             <div class="message-body">
                 ${replyContextHtml}
@@ -1362,9 +1375,13 @@ window.showReceivedDetail = function (fromId) {
         .filter(m => m.fromId === fromId && !m.rootId);
 
     if (messages.length > 0 || true) { // Allow showing empty detail if all deleted
+        const allMsgs = getMessages();
         elements.detailSenderName.textContent = (messages.length > 0 ? messages[0].fromName : 'ユーザー') + 'さんからのメッセージ';
         elements.detailMessagesList.innerHTML = messages.length > 0
-            ? messages.map(msg => createMessageCard(msg, 'received')).join('')
+            ? messages.map(msg => {
+                const latestTime = getLatestThreadTime(msg.id, allMsgs);
+                return createMessageCard(msg, 'received', latestTime);
+            }).join('')
             : '<p class="empty-state">メッセージがありません</p>';
 
         // Mark as Read
@@ -1506,9 +1523,13 @@ window.showSentDetail = function (toId) {
         .filter(m => m.toId === toId && !m.rootId);
 
     if (messages.length > 0 || true) {
+        const allMsgs = getMessages();
         elements.detailRecipientName.textContent = (messages.length > 0 ? messages[0].toName : 'ユーザー') + 'さんへのメッセージ';
         elements.detailSentMessagesList.innerHTML = messages.length > 0
-            ? messages.map(msg => createMessageCard(msg, 'sent')).join('')
+            ? messages.map(msg => {
+                const latestTime = getLatestThreadTime(msg.id, allMsgs);
+                return createMessageCard(msg, 'sent', latestTime);
+            }).join('')
             : '<p class="empty-state">メッセージがありません</p>';
 
         // Mark replies as Read
@@ -1556,7 +1577,11 @@ function renderTimeline() {
             </div>
         `;
     } else {
-        const html = messages.map(msg => createMessageCard(msg, 'timeline')).join('');
+        const allMsgs = getMessages();
+        const html = messages.map(msg => {
+            const latestTime = getLatestThreadTime(msg.id, allMsgs);
+            return createMessageCard(msg, 'timeline', latestTime);
+        }).join('');
         elements.timelineList.innerHTML = html;
     }
 }
