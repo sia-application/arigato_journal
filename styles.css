@@ -21,8 +21,12 @@
     --pink-600: #d53f8c;
 
     --orange-100: #fffaf0;
+    --orange-200: #feebc8;
+    --orange-300: #fbd38d;
     --orange-400: #f6ad55;
     --orange-500: #ed8936;
+    --orange-600: #dd6b20;
+    --orange-700: #c05621;
 
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -1039,10 +1043,11 @@ body::after {
 }
 
 /* Follow Action Button (Pink Outline, Pill Shape) */
+/* Follow Action Button (Orange Outline, Pill Shape) */
 .btn-follow-action {
     background: transparent;
-    color: var(--pink-600);
-    border: 1px solid var(--pink-400);
+    color: var(--orange-600);
+    border: 1px solid var(--orange-400);
     border-radius: 50px;
     font-weight: 600;
     padding: 8px 24px;
@@ -1051,11 +1056,11 @@ body::after {
 }
 
 .btn-follow-action:hover {
-    background: var(--pink-50);
-    color: var(--pink-700);
-    border-color: var(--pink-500);
+    background: var(--orange-100);
+    color: var(--orange-700);
+    border-color: var(--orange-500);
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(236, 72, 153, 0.1);
+    box-shadow: 0 2px 4px rgba(237, 137, 54, 0.1);
 }
 
 /* Blocked Action (Disabled Follow) */
@@ -1100,22 +1105,47 @@ body::after {
     padding: 8px 24px;
 }
 
-/* Following Button Style (Default/List - Filled) */
+/* Success Button (Thanks - Orange Pill) */
+.btn-success {
+    background-color: var(--orange-500);
+    color: white;
+    border: 1px solid transparent;
+    border-radius: 50px;
+    padding: 8px 24px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-success:hover {
+    background-color: var(--orange-600);
+    /* Darker orange */
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(237, 137, 54, 0.2);
+}
+
+/* Small Button Utility */
+.btn-sm {
+    padding: 6px 16px;
+    font-size: 13px;
+}
+
+/* Following Button Style (Default/List - Filled - Orange) */
 .follow-btn.following {
-    background: var(--pink-100);
-    color: var(--pink-600);
+    background: var(--orange-100);
+    color: var(--orange-600);
     border: 1px solid transparent;
 }
 
 .follow-btn.following:hover {
-    background: var(--pink-200);
-    color: var(--pink-700);
+    background: var(--orange-200);
+    color: var(--orange-700);
 }
 
-/* Modal Specific Following Button (Pink Filled - Pill Shape) */
+/* Modal Specific Following Button (Orange Filled - Pill Shape) */
 #modal-action-btn.following {
-    background: var(--pink-100);
-    color: var(--pink-600);
+    background: var(--orange-100);
+    color: var(--orange-600);
     border: 1px solid transparent;
     border-radius: 50px;
     /* Pill shape */

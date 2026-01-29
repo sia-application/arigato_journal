@@ -374,7 +374,7 @@ function updateRecipientOptions() {
         .filter(u => followingIds.includes(u.userId))
         .filter(u => !blocked.includes(u.userId));
 
-    elements.recipientSelect.innerHTML = '<option value="">送りたい相手を選択</option>';
+    elements.recipientSelect.innerHTML = '<option value="">ありがとうのメッセージを送る相手を選択</option>';
     users.forEach(user => {
         const option = document.createElement('option');
         option.value = user.userId;
@@ -445,8 +445,8 @@ function renderFollowingList() {
                     <span class="user-id">@${escapeHtml(user.userId)}</span>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
-                    <button class="follow-btn following" onclick="toggleFollow('${user.userId}')">フォロー中</button>
                     <button class="btn-sm btn-success" style="border-radius: 50px;" onclick="openSendTabWithRecipient('${user.userId}')">ありがとう</button>
+                    <button class="follow-btn following" onclick="toggleFollow('${user.userId}')">フォロー中</button>
                 </div>
             </div>
         `).join('');
@@ -897,7 +897,7 @@ function renderReceivedMessages() {
         elements.receivedMessages.innerHTML = `
             <div class="empty-state">
                 <span class="empty-icon">📭</span>
-                <p>まだ感謝のメッセージはありません</p>
+                <p>まだありがとうのメッセージはありません</p>
             </div>
         `;
     } else {
@@ -919,7 +919,7 @@ function renderSentMessages() {
         elements.sentMessages.innerHTML = `
             <div class="empty-state">
                 <span class="empty-icon">✨</span>
-                <p>まだ感謝を送っていません</p>
+                <p>まだありがとうを送っていません</p>
             </div>
         `;
     } else {
@@ -1077,7 +1077,7 @@ function handleSendMessage(e) {
     const newMessage = sendMessage(recipientId, recipientName, message);
 
     if (newMessage) {
-        showToast(`${recipientName}さんに感謝を送りました！`);
+        showToast(`${recipientName}さんにありがとうを送りました！`);
         elements.messageInput.value = '';
         elements.recipientSelect.value = '';
 
