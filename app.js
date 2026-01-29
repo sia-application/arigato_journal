@@ -295,7 +295,9 @@ function initializeElements() {
         elements.searchUserIdInput = document.getElementById('search-userid');
         elements.searchBtn = document.getElementById('search-btn');
         elements.searchResult = document.getElementById('search-result');
+        elements.searchResult = document.getElementById('search-result');
         elements.followingList = document.getElementById('following-list');
+        elements.blockedList = document.getElementById('blocked-list');
 
         // Profile Modal
         elements.profileModal = document.getElementById('profile-modal');
@@ -342,6 +344,7 @@ function switchTab(tabName) {
         renderSentMessages();
     } else if (tabName === 'friends') {
         renderFollowingList();
+        renderBlockedList();
     }
 }
 
@@ -403,7 +406,7 @@ function renderSearchResult(user) {
                 <span class="user-name user-link" onclick="showUserProfile('${user.userId}')">${escapeHtml(user.name)}</span>
                 <span class="user-id">@${escapeHtml(user.userId)}</span>
             </div>
-            <button class="${btnClass}" onclick="${isBlockedUser ? '' : `toggleFollow('${user.userId}')`}" ${isBlockedUser ? 'disabled' : ''}>${btnText}</button>
+            <button class="${btnClass}" onclick="toggleFollow('${user.userId}')">${btnText}</button>
         </div>
     `;
 
@@ -439,11 +442,23 @@ function renderFollowingList() {
 }
 
 // グローバル関数として公開（HTMLからonclickで呼ぶため）
+// グローバル関数として公開（HTMLからonclickで呼ぶため）
 window.toggleFollow = function (targetUserId) {
-    if (isFollowing(targetUserId)) {
-        unfollowUser(targetUserId);
+    // ブロック中の場合は解除を確認
+    if (isBlocked(targetUserId)) {
+        if (confirm('ブロックを解除しますか？')) {
+            unblockUser(targetUserId);
+            showToast('ブロックを解除しました');
+        } else {
+            return;
+        }
     } else {
-        followUser(targetUserId);
+        // 通常のフォロー/解除処理
+        if (isFollowing(targetUserId)) {
+            unfollowUser(targetUserId);
+        } else {
+            followUser(targetUserId);
+        }
     }
 
     // UI更新
@@ -453,8 +468,37 @@ window.toggleFollow = function (targetUserId) {
         renderSearchResult(searchedUser);
     }
     renderFollowingList();
+    renderBlockedList();
     updateRecipientOptions(); // 宛先リストも更新
 };
+
+function renderBlockedList() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    const blockedIds = currentUser.blocked || [];
+    const allUsers = getUsers();
+    const blockedUsers = allUsers.filter(u => blockedIds.includes(u.userId));
+
+    if (blockedUsers.length === 0) {
+        elements.blockedList.innerHTML = `
+            <div class="empty-state">
+                <span class="empty-icon">🚫</span>
+                <p>ブロックしている人はいません</p>
+            </div>
+        `;
+    } else {
+        elements.blockedList.innerHTML = blockedUsers.map(user => `
+            <div class="user-card">
+                <div class="user-info">
+                    <span class="user-name user-link" onclick="showUserProfile('${user.userId}')">${escapeHtml(user.name)}</span>
+                    <span class="user-id">@${escapeHtml(user.userId)}</span>
+                </div>
+                <button class="follow-btn blocked" onclick="toggleFollow('${user.userId}')">ブロック中</button>
+            </div>
+        `).join('');
+    }
+}
 
 // プロフィール表示
 window.showUserProfile = function (userId) {
@@ -521,6 +565,7 @@ window.showUserProfile = function (userId) {
         }
         renderFollowingList();
         renderFollowingList();
+        renderBlockedList();
     });
 
     // Block button listener
@@ -534,7 +579,9 @@ window.showUserProfile = function (userId) {
         }
         // UI updates
         showUserProfile(user.userId); // Reload modal content
+        showUserProfile(user.userId); // Reload modal content
         renderFollowingList(); // Update friends list
+        renderBlockedList(); // Update blocked list
         updateRecipientOptions(); // Update message recipients
 
         // 検索結果も更新
@@ -550,12 +597,25 @@ window.showUserProfile = function (userId) {
 
 function updateFollowButton(userId) {
     const isFollowed = isFollowing(userId);
-    // If blocked, disable follow button or hide it? For now just keep logic simple
-    elements.modalActionBtn.textContent = isFollowed ? 'フォロー中' : 'フォローする';
-    if (isFollowed) {
-        elements.modalActionBtn.classList.add('following');
+    const isBlockedUser = isBlocked(userId);
+
+    if (isBlockedUser) {
+        elements.modalActionBtn.textContent = 'フォローできません';
+        elements.modalActionBtn.disabled = true;
+        elements.modalActionBtn.classList.add('blocked-action');
+        elements.modalActionBtn.classList.remove('following', 'btn-primary');
     } else {
-        elements.modalActionBtn.classList.remove('following');
+        elements.modalActionBtn.disabled = false;
+        elements.modalActionBtn.textContent = isFollowed ? 'フォロー中' : 'フォローする';
+        elements.modalActionBtn.classList.remove('blocked-action');
+
+        if (isFollowed) {
+            elements.modalActionBtn.classList.add('following');
+            elements.modalActionBtn.classList.remove('btn-primary');
+        } else {
+            elements.modalActionBtn.classList.remove('following');
+            elements.modalActionBtn.classList.add('btn-primary');
+        }
     }
 }
 

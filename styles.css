@@ -1039,5 +1039,5 @@ body::after {
     background: #ef4444 !important;
     color: white !important;
     border: 1px solid #ef4444 !important;
-    cursor: default;
+    cursor: pointer !important;
 }
