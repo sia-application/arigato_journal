@@ -293,8 +293,8 @@ function initializeElements() {
 
         // Search & Friends
         elements.searchUserIdInput = document.getElementById('search-userid');
-        elements.searchBtn = document.getElementById('search-btn');
         elements.searchResult = document.getElementById('search-result');
+        elements.followingList = document.getElementById('following-list');
         elements.searchResult = document.getElementById('search-result');
         elements.followingList = document.getElementById('following-list');
         elements.blockedList = document.getElementById('blocked-list');
@@ -972,7 +972,25 @@ function initialize() {
     if (elements.mainScreen) {
         elements.logoutBtn.addEventListener('click', handleLogout);
         elements.sendForm.addEventListener('submit', handleSendMessage);
-        elements.searchBtn.addEventListener('click', handleSearch);
+        elements.logoutBtn.addEventListener('click', handleLogout);
+        elements.sendForm.addEventListener('submit', handleSendMessage);
+
+        // リアルタイム検索
+        elements.searchUserIdInput.addEventListener('input', (e) => {
+            const userId = e.target.value.trim();
+            if (userId) {
+                const user = findUser(userId);
+                // 自分自身は検索結果に表示しない
+                if (user) {
+                    renderSearchResult(user);
+                } else {
+                    elements.searchResult.innerHTML = '';
+                }
+            } else {
+                elements.searchResult.innerHTML = '';
+            }
+        });
+
         elements.tabBtns.forEach(btn => {
             btn.addEventListener('click', handleTabClick);
         });
