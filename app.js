@@ -15,42 +15,27 @@ const STORAGE_KEYS = {
 
 // 初期データの設定
 function initializeData() {
-    if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-        // デモ用の初期ユーザー
+    // 既存のデータからサンプルユーザー（さくら、たける）を削除
+    let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+    const sampleIds = ['user1', 'user2']; // user1: さくら, user2: たける
 
-        const initialUsers = [
-            { userId: 'user1', name: 'さくら', password: 'password', createdAt: Date.now() },
-            { userId: 'user2', name: 'たける', password: 'password', createdAt: Date.now() },
-            { userId: 'user3', name: 'あおい', password: 'password', createdAt: Date.now() }
-        ];
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
+    const beforeUserCount = users.length;
+    users = users.filter(u => !sampleIds.includes(u.userId));
+
+    if (users.length !== beforeUserCount) {
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        console.log('Sample users removed');
     }
 
-    if (!localStorage.getItem(STORAGE_KEYS.MESSAGES)) {
-        // デモ用の初期メッセージ
-        const initialMessages = [
-            {
-                id: 'msg1',
-                fromId: 'user1',
-                fromName: 'さくら',
-                toId: 'user2',
-                toName: 'たける',
-                message: 'いつも仕事を手伝ってくれてありがとう！本当に助かっています。',
-                isPublic: true,
-                createdAt: Date.now() - 86400000
-            },
-            {
-                id: 'msg2',
-                fromId: 'user2',
-                fromName: 'たける',
-                toId: 'user3',
-                toName: 'あおい',
-                message: '素敵なアドバイスをありがとう。おかげで問題が解決しました！',
-                isPublic: true,
-                createdAt: Date.now() - 3600000
-            }
-        ];
-        localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(initialMessages));
+    // サンプルユーザーに関連するメッセージも削除
+    let messages = JSON.parse(localStorage.getItem(STORAGE_KEYS.MESSAGES) || '[]');
+    const beforeMsgCount = messages.length;
+
+    messages = messages.filter(m => !sampleIds.includes(m.fromId) && !sampleIds.includes(m.toId));
+
+    if (messages.length !== beforeMsgCount) {
+        localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
+        console.log('Sample messages removed');
     }
 }
 
@@ -371,14 +356,17 @@ function switchTab(tabName) {
     });
 
     // タブ切り替え時にコンテンツを更新
-    if (tabName === 'received') {
+    if (tabName === 'timeline') {
+        renderTimeline();
+    } else if (tabName === 'received') {
         renderReceivedMessages();
     } else if (tabName === 'sent') {
         renderSentMessages();
     } else if (tabName === 'send') {
-        // デフォルトでは宛先選択を有効化
+        // デフォルトでは宛先選択を有効化してリセット
         if (elements.recipientSelect) {
             elements.recipientSelect.disabled = false;
+            elements.recipientSelect.value = ''; // Reset selection
         }
     } else if (tabName === 'friends') {
         renderSentMessages();
@@ -1152,6 +1140,36 @@ function renderSentMessages() {
     }
 }
 
+// タイムラインを表示
+function renderTimeline() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    // ブロックユーザーのIDリスト
+    const blockedIds = currentUser.blocked || [];
+
+    // 全メッセージを取得
+    let messages = getMessages();
+
+    // ブロックしている/されているユーザーのメッセージを除外
+    messages = messages.filter(m =>
+        !blockedIds.includes(m.fromId) &&
+        !blockedIds.includes(m.toId)
+    );
+
+    if (messages.length === 0) {
+        elements.timelineList.innerHTML = `
+            <div class="empty-state">
+                <span class="empty-icon">📱</span>
+                <p>まだメッセージはありません</p>
+            </div>
+        `;
+    } else {
+        const html = messages.map(msg => createMessageCard(msg, 'timeline')).join('');
+        elements.timelineList.innerHTML = html;
+    }
+}
+
 
 // 受信バッジを更新
 function updateReceivedBadge(count) {
@@ -1465,11 +1483,12 @@ function initialize() {
         elements.currentUserBadge.onclick = () => showUserProfile(currentUser.userId);
 
         updateRecipientOptions();
-        switchTab('timeline');
+        switchTab('timeline'); // Default to timeline tab
 
-        // 受信メッセージ数を更新
-        const receivedCount = getReceivedMessages(currentUser.userId).length;
-        updateReceivedBadge(receivedCount);
+        // 受信メッセージ数を更新 (Unread only)
+        const myMessages = getReceivedMessages(currentUser.userId);
+        const unreadCount = myMessages.filter(m => !m.isRead).length;
+        updateReceivedBadge(unreadCount);
     }
 }
 
