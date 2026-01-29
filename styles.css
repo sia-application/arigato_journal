@@ -1094,6 +1094,12 @@ body::after {
     /* Match padding */
 }
 
+/* Unblocked Block Button (Initial State) - Pill Shape */
+#modal-block-btn {
+    border-radius: 50px;
+    padding: 8px 24px;
+}
+
 /* Following Button Style (Default/List - Filled) */
 .follow-btn.following {
     background: var(--pink-100);
