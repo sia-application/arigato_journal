@@ -375,6 +375,13 @@ function switchTab(tabName) {
         renderReceivedMessages();
     } else if (tabName === 'sent') {
         renderSentMessages();
+    } else if (tabName === 'send') {
+        // デフォルトでは宛先選択を有効化
+        if (elements.recipientSelect) {
+            elements.recipientSelect.disabled = false;
+        }
+    } else if (tabName === 'friends') {
+        renderSentMessages();
     } else if (tabName === 'friends') {
         renderFollowingList();
         renderFollowerList();
@@ -527,6 +534,7 @@ window.openSendTabWithRecipient = function (userId) {
 
     // 宛先を選択
     elements.recipientSelect.value = userId;
+    elements.recipientSelect.disabled = true; // 宛先を変更できないようにする
 
     // フォームにスクロール
     elements.sendForm.scrollIntoView({ behavior: 'smooth' });
