@@ -96,12 +96,30 @@
             <div id="tab-received" class="tab-content">
                 <div class="messages-container">
                     <h2 class="section-title">受け取ったありがとう</h2>
-                    <div id="received-messages" class="messages-list">
+
+                    <!-- Sender List View -->
+                    <div id="received-senders-list" class="messages-list">
+                        <!-- List of senders will be rendered here -->
                         <div class="empty-state">
                             <span class="empty-icon">📭</span>
                             <p>まだありがとうのメッセージはありません</p>
                         </div>
                     </div>
+
+                    <!-- Detail View (Hidden by default) -->
+                    <div id="received-messages-detail" class="hidden">
+                        <div class="detail-header"
+                            style="display: flex; align-items: center; margin-bottom: 16px; gap: 12px;">
+                            <button onclick="backToReceivedList()"
+                                style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--pink-500);">←</button>
+                            <h3 id="detail-sender-name" style="margin: 0; font-size: 18px;">Sender Name</h3>
+                        </div>
+                        <div id="detail-messages-list" class="messages-list">
+                            <!-- Messages from specific sender -->
+                        </div>
+                    </div>
+
+                    <!-- Old container reference removed, using new ones -->
                 </div>
             </div>
 
@@ -141,42 +159,40 @@
                     </div>
                 </div>
 
-                <div class="messages-container" style="margin-top: 24px;">
-                    <!-- List Type Selector -->
-                    <select id="list-type-select" class="form-select"
-                        style="width: 100%; margin-bottom: 16px; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--pink-200); background-color: white; font-size: 16px; appearance: none; -webkit-appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23ED64A6%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 12px center; background-size: 12px;">
-                        <option value="following">フォロー中</option>
-                        <option value="followers">フォロワー</option>
-                        <option value="blocked">ブロック中</option>
-                    </select>
+                <!-- List Type Selector -->
+                <select id="list-type-select" class="form-select"
+                    style="width: 100%; margin-top: 24px; margin-bottom: 16px; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--pink-200); background-color: white; font-size: 16px; appearance: none; -webkit-appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23ED64A6%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 12px center; background-size: 12px;">
+                    <option value="following">フォロー中</option>
+                    <option value="followers">フォロワー</option>
+                    <option value="blocked">ブロック中</option>
+                </select>
 
-                    <div id="following-list-wrapper">
-                        <div id="following-list" class="messages-list">
-                            <!-- フォロー中のユーザーがここに表示されます -->
-                            <div class="empty-state">
-                                <span class="empty-icon">👥</span>
-                                <p>まだフォローしている人はいません</p>
-                            </div>
+                <div id="following-list-wrapper">
+                    <div id="following-list" class="messages-list">
+                        <!-- フォロー中のユーザーがここに表示されます -->
+                        <div class="empty-state">
+                            <span class="empty-icon">👥</span>
+                            <p>まだフォローしている人はいません</p>
                         </div>
                     </div>
+                </div>
 
-                    <div id="follower-list-wrapper" class="hidden">
-                        <div id="follower-list" class="messages-list">
-                            <!-- フォロワーがここに表示されます -->
-                            <div class="empty-state">
-                                <span class="empty-icon">🥰</span>
-                                <p>まだフォロワーはいません</p>
-                            </div>
+                <div id="follower-list-wrapper" class="hidden">
+                    <div id="follower-list" class="messages-list">
+                        <!-- フォロワーがここに表示されます -->
+                        <div class="empty-state">
+                            <span class="empty-icon">🥰</span>
+                            <p>まだフォロワーはいません</p>
                         </div>
                     </div>
+                </div>
 
-                    <div id="blocked-list-wrapper" class="hidden">
-                        <div id="blocked-list" class="messages-list">
-                            <!-- ブロック中のユーザーがここに表示されます -->
-                            <div class="empty-state">
-                                <span class="empty-icon">🚫</span>
-                                <p>ブロックしている人はいません</p>
-                            </div>
+                <div id="blocked-list-wrapper" class="hidden">
+                    <div id="blocked-list" class="messages-list">
+                        <!-- ブロック中のユーザーがここに表示されます -->
+                        <div class="empty-state">
+                            <span class="empty-icon">🚫</span>
+                            <p>ブロックしている人はいません</p>
                         </div>
                     </div>
                 </div>

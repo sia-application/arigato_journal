@@ -118,7 +118,8 @@ function sendMessage(toId, toName, message) {
         toId: toId,
         toName: toName,
         message: message,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        isRead: false // Initialize read status
     };
     messages.unshift(newMessage);
     saveMessages(messages);
@@ -298,6 +299,12 @@ function initializeElements() {
         elements.sentMessages = document.getElementById('sent-messages');
         elements.timelineList = document.getElementById('timeline-list');
         elements.receivedBadge = document.getElementById('received-badge');
+
+        // Received Tab Grouping Elements
+        elements.receivedSendersList = document.getElementById('received-senders-list');
+        elements.receivedMessagesDetail = document.getElementById('received-messages-detail');
+        elements.detailSenderName = document.getElementById('detail-sender-name');
+        elements.detailMessagesList = document.getElementById('detail-messages-list');
 
         // Search & Friends
         elements.searchUserIdInput = document.getElementById('search-userid');
@@ -986,11 +993,16 @@ function createMessageCard(msg, type = 'sent') {
          `;
     }
 
+    // Unread styling
+    const unreadClass = (type === 'received' && !msg.isRead) ? 'unread' : '';
+    const unreadBadge = (type === 'received' && !msg.isRead) ? '<span class="unread-badge">NEW</span>' : '';
+
     return `
-        <div class="message-card">
+        <div class="message-card ${unreadClass}">
             <div class="message-header">
                 <div class="message-users">
                     <span class="message-from user-link" onclick="showUserProfile('${escapeHtml(msg.fromId)}')">${escapeHtml(msg.fromName)}</span>
+                    ${unreadBadge}
                     ${toHtml}
                 </div>
                 <span class="message-time">${timeString}</span>
@@ -1003,6 +1015,7 @@ function createMessageCard(msg, type = 'sent') {
 }
 
 // 受信メッセージを表示
+// 受信メッセージを表示 (Sender Grouping)
 function renderReceivedMessages() {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
@@ -1010,19 +1023,107 @@ function renderReceivedMessages() {
     const messages = getReceivedMessages(currentUser.userId);
 
     if (messages.length === 0) {
-        elements.receivedMessages.innerHTML = `
+        elements.receivedSendersList.innerHTML = `
             <div class="empty-state">
                 <span class="empty-icon">📭</span>
                 <p>まだありがとうのメッセージはありません</p>
             </div>
         `;
+        // Ensure detail view is hidden
+        elements.receivedMessagesDetail.classList.add('hidden');
+        elements.receivedSendersList.classList.remove('hidden');
     } else {
-        elements.receivedMessages.innerHTML = messages.map(msg => createMessageCard(msg, 'received')).join('');
+        // Group by Sender
+        const senderGroups = {};
+        messages.forEach(msg => {
+            if (!senderGroups[msg.fromId]) {
+                senderGroups[msg.fromId] = {
+                    name: msg.fromName,
+                    messages: []
+                };
+            }
+            senderGroups[msg.fromId].messages.push(msg);
+        });
+
+        // Create Sender List HTML
+        const sendersHtml = Object.keys(senderGroups).map(fromId => {
+            const group = senderGroups[fromId];
+            const count = group.messages.length;
+
+            // Unread Logic
+            const hasUnread = group.messages.some(m => !m.isRead);
+            const unreadIndicator = hasUnread ? '<span class="unread-indicator"></span>' : '';
+            const unreadStyle = hasUnread ? 'font-weight: bold; color: var(--text-primary);' : 'color: var(--text-secondary);';
+
+            return `
+            <div class="user-card" onclick="showReceivedDetail('${fromId}')" style="cursor: pointer;">
+                <div class="user-info">
+                    <span class="user-name">${escapeHtml(group.name)} ${unreadIndicator}</span>
+                    <span class="user-id" style="font-size: 12px; ${unreadStyle}">メッセージ ${count}件</span>
+                </div>
+                <div style="font-size: 20px; color: var(--pink-400);">
+                    →
+                </div>
+            </div>
+            `;
+        }).join('');
+
+        elements.receivedSendersList.innerHTML = sendersHtml;
+
+        // Ensure List View is active
+        elements.receivedSendersList.classList.remove('hidden');
+        elements.receivedMessagesDetail.classList.add('hidden');
     }
 
-    // バッジを更新
-    updateReceivedBadge(messages.length);
+    // バッジを更新 (Count only unread)
+    const unreadCount = messages.filter(m => !m.isRead).length;
+    updateReceivedBadge(unreadCount);
 }
+
+// Show Detail View for specific sender
+window.showReceivedDetail = function (fromId) {
+    const currentUser = getCurrentUser();
+    const messages = getReceivedMessages(currentUser.userId).filter(m => m.fromId === fromId);
+
+    if (messages.length > 0) {
+        elements.detailSenderName.textContent = messages[0].fromName + 'さんからのメッセージ';
+        elements.detailMessagesList.innerHTML = messages.map(msg => createMessageCard(msg, 'received')).join('');
+
+        // Mark as Read
+        markMessagesAsRead(currentUser.userId, fromId);
+
+        // Show Detail, Hide List
+        elements.receivedSendersList.classList.add('hidden');
+        elements.receivedMessagesDetail.classList.remove('hidden');
+    }
+};
+
+function markMessagesAsRead(userId, fromId) {
+    const messages = getMessages();
+    let updated = false;
+    messages.forEach(msg => {
+        if (msg.toId === userId && msg.fromId === fromId && !msg.isRead) {
+            msg.isRead = true;
+            updated = true;
+        }
+    });
+
+    if (updated) {
+        saveMessages(messages);
+        // Update badge immediately
+        const currentUser = getCurrentUser();
+        const myMessages = getReceivedMessages(currentUser.userId);
+        const unreadCount = myMessages.filter(m => !m.isRead).length;
+        updateReceivedBadge(unreadCount);
+    }
+}
+
+// Back to List View
+window.backToReceivedList = function () {
+    renderReceivedMessages(); // Refresh list to update unread status/dots
+    elements.receivedSendersList.classList.remove('hidden');
+    elements.receivedMessagesDetail.classList.add('hidden');
+};
 
 // 送信済みメッセージを表示
 function renderSentMessages() {
