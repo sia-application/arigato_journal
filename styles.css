@@ -26,6 +26,13 @@
     --pink-500: #ed64a6;
     --pink-600: #d53f8c;
 
+    --blue-100: #ebf8ff;
+    --blue-200: #bee3f8;
+    --blue-300: #90cdf4;
+    --blue-400: #63b3ed;
+    --blue-500: #4299e1;
+    --blue-600: #3182ce;
+
     --orange-100: #fffaf0;
     --orange-200: #feebc8;
     --orange-300: #fbd38d;
@@ -683,6 +690,24 @@ body::after {
     font-weight: 600;
     color: var(--orange-500);
 }
+
+/* 自分のメッセージ用スタイル */
+.message-card.own-message {
+    border: 1px solid var(--blue-200);
+}
+
+.message-card.own-message .message-from {
+    color: var(--blue-600);
+}
+
+.message-card.own-message .message-body {
+    background: var(--blue-100);
+}
+
+.message-card.own-message .message-body::before {
+    color: var(--blue-300);
+}
+
 
 .message-time {
     font-size: 12px;

@@ -979,6 +979,9 @@ function closeModal() {
 function createMessageCard(msg, type = 'sent') {
     const date = new Date(msg.createdAt);
     const timeString = formatDate(date);
+    const currentUser = getCurrentUser();
+    const isOwnMessage = currentUser && msg.fromId === currentUser.userId;
+    const ownMessageClass = isOwnMessage ? 'own-message' : '';
 
     // 受信の場合は相手（自分）を表示しない
     let toHtml = '';
@@ -994,7 +997,7 @@ function createMessageCard(msg, type = 'sent') {
     const unreadBadge = (type === 'received' && !msg.isRead) ? '<span class="unread-badge">NEW</span>' : '';
 
     return `
-        <div class="message-card ${unreadClass}">
+        <div class="message-card ${unreadClass} ${ownMessageClass}">
             <div class="message-header">
                 <div class="message-users">
                     <span class="message-from user-link" onclick="showUserProfile('${escapeHtml(msg.fromId)}')">${escapeHtml(msg.fromName)}</span>
