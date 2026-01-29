@@ -1410,8 +1410,8 @@ window.showReceivedDetail = function (fromId) {
             ? messageData.map(data => createMessageCard(data.msg, 'received', data.latestTime, data.hasUnread)).join('')
             : '<p class="empty-state">メッセージがありません</p>';
 
-        // Mark as Read
-        markMessagesAsRead(currentUser.userId, fromId);
+        // Mark as Read (Only threads started by the partner in Received history)
+        markMessagesAsRead(currentUser.userId, fromId, false);
 
         // Show Detail, Hide List
         elements.receivedSendersList.classList.add('hidden');
@@ -1419,18 +1419,31 @@ window.showReceivedDetail = function (fromId) {
     }
 };
 
-function markMessagesAsRead(userId, fromId) {
-    const messages = getMessages();
+function markMessagesAsRead(userId, partnerId, isSentHistory) {
+    const allMessages = getMessages();
     let updated = false;
-    messages.forEach(msg => {
-        if (msg.toId === userId && msg.fromId === fromId && !msg.isRead) {
-            msg.isRead = true;
-            updated = true;
+
+    allMessages.forEach(msg => {
+        if (msg.toId === userId && msg.fromId === partnerId && !msg.isRead) {
+            const rootId = msg.rootId || msg.id;
+            const rootMsg = allMessages.find(m => m.id === rootId);
+
+            if (rootMsg) {
+                const threadStartedByMe = rootMsg.fromId === userId;
+                if (isSentHistory === threadStartedByMe) {
+                    msg.isRead = true;
+                    updated = true;
+                }
+            } else if (!isSentHistory) {
+                // Fallback: If no root found, assume Received history context if we received it
+                msg.isRead = true;
+                updated = true;
+            }
         }
     });
 
     if (updated) {
-        saveMessages(messages);
+        saveMessages(allMessages);
         updateAllBadges();
     }
 }
@@ -1605,8 +1618,8 @@ window.showSentDetail = function (toId) {
             ? messageData.map(data => createMessageCard(data.msg, 'sent', data.latestTime, data.hasUnread)).join('')
             : '<p class="empty-state">メッセージがありません</p>';
 
-        // Mark replies as Read
-        markMessagesAsRead(currentUser.userId, toId);
+        // Mark replies as Read (Only threads started by me in Sent history)
+        markMessagesAsRead(currentUser.userId, toId, true);
 
         elements.sentRecipientsList.classList.add('hidden');
         elements.sentMessagesDetail.classList.remove('hidden');
