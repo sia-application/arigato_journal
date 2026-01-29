@@ -1165,8 +1165,13 @@ function getLatestThreadTime(rootId, allMessages) {
     return Math.max(...threadMsgs.map(m => m.createdAt));
 }
 
+// スレッド内に自分宛の未読メッセージがあるか確認
+function hasUnreadInThread(rootId, userId, allMessages) {
+    return allMessages.some(m => (m.rootId === rootId || m.id === rootId) && m.toId === userId && !m.isRead);
+}
+
 // メッセージカードのHTML生成
-function createMessageCard(msg, type = 'sent', latestTime = null) {
+function createMessageCard(msg, type = 'sent', latestTime = null, hasUnread = null) {
     const timeString = formatDate(msg.createdAt);
     const currentUser = getCurrentUser();
     const isOwnMessage = currentUser && msg.fromId === currentUser.userId;
@@ -1232,8 +1237,9 @@ function createMessageCard(msg, type = 'sent', latestTime = null) {
     }
 
     // Unread styling
-    const unreadClass = (type === 'received' && !msg.isRead) ? 'unread' : '';
-    const unreadBadge = (type === 'received' && !msg.isRead) ? '<span class="unread-badge">NEW</span>' : '';
+    const showUnread = hasUnread !== null ? hasUnread : (type === 'received' && !msg.isRead);
+    const unreadClass = showUnread ? 'unread' : '';
+    const unreadBadge = showUnread ? '<span class="unread-badge">NEW</span>' : '';
 
     // 最新アクティビティ表示
     let latestActivityHtml = '';
@@ -1324,7 +1330,21 @@ function renderReceivedMessages() {
                 latest: partnerGroups[fromId] ? partnerGroups[fromId].latest : 0,
                 unreadCount: partnerGroups[fromId] ? partnerGroups[fromId].unread : 0
             };
-        }).sort((a, b) => b.latest - a.latest);
+        }).sort((a, b) => b.latest - a.latest)
+            .filter(group => group.messages.some(m => !m.rootId));
+
+        if (sortedPartners.length === 0) {
+            elements.receivedSendersList.innerHTML = `
+                <div class="empty-state">
+                    <span class="empty-icon">📭</span>
+                    <p>まだありがとうのメッセージはありません</p>
+                </div>
+            `;
+            elements.receivedMessagesDetail.classList.add('hidden');
+            elements.receivedSendersList.classList.remove('hidden');
+            currentReceivedPartnerId = null;
+            return;
+        }
 
         // Create HTML
         const sendersHtml = sortedPartners.map(group => {
@@ -1361,9 +1381,8 @@ function renderReceivedMessages() {
         }
     }
 
-    // バッジを更新 (Count only unread ROOT messages)
-    const unreadCount = messages.filter(m => !m.isRead && !m.rootId).length;
-    updateReceivedBadge(unreadCount);
+    // 全体のバッジを更新
+    updateAllBadges();
 }
 
 // Show Detail View for specific sender
@@ -1376,12 +1395,19 @@ window.showReceivedDetail = function (fromId) {
 
     if (messages.length > 0 || true) { // Allow showing empty detail if all deleted
         const allMsgs = getMessages();
+
+        // Calculate info for each root message and sort by latest activity
+        const messageData = messages.map(msg => {
+            return {
+                msg: msg,
+                latestTime: getLatestThreadTime(msg.id, allMsgs),
+                hasUnread: hasUnreadInThread(msg.id, currentUser.userId, allMsgs)
+            };
+        }).sort((a, b) => b.latestTime - a.latestTime);
+
         elements.detailSenderName.textContent = (messages.length > 0 ? messages[0].fromName : 'ユーザー') + 'さんからのメッセージ';
-        elements.detailMessagesList.innerHTML = messages.length > 0
-            ? messages.map(msg => {
-                const latestTime = getLatestThreadTime(msg.id, allMsgs);
-                return createMessageCard(msg, 'received', latestTime);
-            }).join('')
+        elements.detailMessagesList.innerHTML = messageData.length > 0
+            ? messageData.map(data => createMessageCard(data.msg, 'received', data.latestTime, data.hasUnread)).join('')
             : '<p class="empty-state">メッセージがありません</p>';
 
         // Mark as Read
@@ -1405,12 +1431,38 @@ function markMessagesAsRead(userId, fromId) {
 
     if (updated) {
         saveMessages(messages);
-        // Update badge immediately
-        const currentUser = getCurrentUser();
-        const myMessages = getReceivedMessages(currentUser.userId);
-        const unreadCount = myMessages.filter(m => !m.isRead).length;
-        updateReceivedBadge(unreadCount);
+        updateAllBadges();
     }
+}
+
+function updateAllBadges() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    const allMessages = getMessages();
+    const myUnreads = allMessages.filter(m => m.toId === currentUser.userId && !m.isRead);
+
+    let receivedCount = 0;
+    let sentCount = 0;
+
+    myUnreads.forEach(m => {
+        const rootId = m.rootId || m.id;
+        const rootMsg = allMessages.find(msg => msg.id === rootId);
+
+        if (rootMsg) {
+            if (rootMsg.fromId === currentUser.userId) {
+                sentCount++;
+            } else {
+                receivedCount++;
+            }
+        } else {
+            // Fallback: If root is missing, assume it belongs to Received if we received it
+            receivedCount++;
+        }
+    });
+
+    updateReceivedBadge(receivedCount);
+    updateSentBadge(sentCount);
 }
 
 // Back to List View
@@ -1469,7 +1521,21 @@ function renderSentMessages() {
                 ...groups[toId],
                 latest: partnerGroups[toId] ? partnerGroups[toId].latest : 0
             };
-        }).sort((a, b) => b.latest - a.latest);
+        }).sort((a, b) => b.latest - a.latest)
+            .filter(recipient => recipient.messages.some(m => !m.rootId));
+
+        if (sortedRecipients.length === 0) {
+            elements.sentRecipientsList.innerHTML = `
+                <div class="empty-state">
+                    <span class="empty-icon">✨</span>
+                    <p>まだありがとうを送っていません</p>
+                </div>
+            `;
+            elements.sentMessagesDetail.classList.add('hidden');
+            elements.sentRecipientsList.classList.remove('hidden');
+            currentSentPartnerId = null;
+            return;
+        }
 
         // Create HTML
         let totalUnreadSent = 0;
@@ -1509,8 +1575,8 @@ function renderSentMessages() {
             elements.sentRecipientsList.classList.remove('hidden');
         }
 
-        // Update Sent Badge
-        updateSentBadge(totalUnreadSent);
+        // 全体のバッジを更新
+        updateAllBadges();
     }
 }
 
@@ -1524,12 +1590,19 @@ window.showSentDetail = function (toId) {
 
     if (messages.length > 0 || true) {
         const allMsgs = getMessages();
+
+        // Calculate info for each root message and sort by latest activity
+        const messageData = messages.map(msg => {
+            return {
+                msg: msg,
+                latestTime: getLatestThreadTime(msg.id, allMsgs),
+                hasUnread: hasUnreadInThread(msg.id, currentUser.userId, allMsgs)
+            };
+        }).sort((a, b) => b.latestTime - a.latestTime);
+
         elements.detailRecipientName.textContent = (messages.length > 0 ? messages[0].toName : 'ユーザー') + 'さんへのメッセージ';
-        elements.detailSentMessagesList.innerHTML = messages.length > 0
-            ? messages.map(msg => {
-                const latestTime = getLatestThreadTime(msg.id, allMsgs);
-                return createMessageCard(msg, 'sent', latestTime);
-            }).join('')
+        elements.detailSentMessagesList.innerHTML = messageData.length > 0
+            ? messageData.map(data => createMessageCard(data.msg, 'sent', data.latestTime, data.hasUnread)).join('')
             : '<p class="empty-state">メッセージがありません</p>';
 
         // Mark replies as Read
@@ -1578,9 +1651,18 @@ function renderTimeline() {
         `;
     } else {
         const allMsgs = getMessages();
-        const html = messages.map(msg => {
-            const latestTime = getLatestThreadTime(msg.id, allMsgs);
-            return createMessageCard(msg, 'timeline', latestTime);
+
+        // Calculate info for each root message and sort by latest activity
+        const messageData = messages.map(msg => {
+            return {
+                msg: msg,
+                latestTime: getLatestThreadTime(msg.id, allMsgs),
+                hasUnread: hasUnreadInThread(msg.id, currentUser.userId, allMsgs)
+            };
+        }).sort((a, b) => b.latestTime - a.latestTime);
+
+        const html = messageData.map(data => {
+            return createMessageCard(data.msg, 'timeline', data.latestTime, data.hasUnread);
         }).join('');
         elements.timelineList.innerHTML = html;
     }
@@ -1857,24 +1939,8 @@ function initialize() {
 
         switchTab('timeline'); // Default to timeline tab
 
-        // 受信メッセージ数を更新 (Unread ROOT only)
-        const myReceived = getReceivedMessages(currentUser.userId);
-        updateReceivedBadge(myReceived.filter(m => !m.isRead && !m.rootId).length);
-
-        // 送信メッセージへの返信数を更新 (Unread REPLIES only)
-        const allMsgs = getMessages();
-        const sentMsgs = getSentMessages(currentUser.userId);
-        const uniqueRecipients = [...new Set(sentMsgs.map(m => m.toId))];
-        let unreadReplies = 0;
-        uniqueRecipients.forEach(rId => {
-            unreadReplies += allMsgs.filter(m =>
-                m.toId === currentUser.userId &&
-                m.fromId === rId &&
-                !m.isRead &&
-                m.rootId
-            ).length;
-        });
-        updateSentBadge(unreadReplies);
+        // 全体のバッジを更新
+        updateAllBadges();
     }
 }
 
@@ -2016,36 +2082,6 @@ function handleSearch() {
 
     const user = findUser(userId);
     renderSearchResult(user);
-}
-
-function handleSendMessage(e) {
-    e.preventDefault();
-
-    const recipientId = elements.recipientSelect.value;
-    const recipientOption = elements.recipientSelect.options[elements.recipientSelect.selectedIndex];
-    const recipientName = recipientOption.dataset.name;
-    const message = elements.messageInput.value.trim();
-
-    if (!recipientId || !message) return;
-
-    const options = {};
-    if (currentReplyContext) {
-        options.replyTo = currentReplyContext;
-    }
-
-    const newMessage = sendMessage(recipientId, recipientName, message, options);
-
-    if (newMessage) {
-        showToast(`${recipientName}さんにありがとうを送りました！`);
-        elements.messageInput.value = '';
-        elements.recipientSelect.value = '';
-
-        // Reset Reply Context
-        cancelReply();
-
-        // Update Sent Messages List
-        renderSentMessages();
-    }
 }
 
 // DOMが読み込まれたら初期化
