@@ -127,11 +127,22 @@ function getSentMessages(userId) {
 }
 
 // メッセージを削除
+let currentReceivedPartnerId = null;
+let currentSentPartnerId = null;
+
 function deleteMessage(messageId) {
     if (!confirm('このメッセージを削除してもよろしいですか？')) return;
 
     let messages = getMessages();
-    messages = messages.filter(m => m.id !== messageId);
+    const targetMsg = messages.find(m => m.id === messageId);
+
+    // Cascading deletion: If root message is deleted, delete its thread
+    if (targetMsg && !targetMsg.rootId) {
+        messages = messages.filter(m => m.id !== messageId && m.rootId !== messageId);
+    } else {
+        messages = messages.filter(m => m.id !== messageId);
+    }
+
     saveMessages(messages);
 
     showToast('メッセージを削除しました');
@@ -140,6 +151,15 @@ function deleteMessage(messageId) {
     renderTimeline();
     renderSentMessages();
     renderReceivedMessages();
+
+    // Preserve Detail View if open
+    if (currentSentPartnerId && !elements.sentMessagesDetail.classList.contains('hidden')) {
+        showSentDetail(currentSentPartnerId);
+    }
+    if (currentReceivedPartnerId && !elements.receivedMessagesDetail.classList.contains('hidden')) {
+        showReceivedDetail(currentReceivedPartnerId);
+    }
+
     if (currentThreadContext) {
         renderThreadMessages();
     }
@@ -430,6 +450,7 @@ function initializeElements() {
         elements.messageInput = document.getElementById('message');
         elements.timelineList = document.getElementById('timeline-list');
         elements.receivedBadge = document.getElementById('received-badge');
+        elements.sentBadge = document.getElementById('sent-badge');
 
         // Received Tab Grouping Elements
         elements.receivedSendersList = document.getElementById('received-senders-list');
@@ -519,8 +540,14 @@ function switchTab(tabName) {
     if (tabName === 'timeline') {
         renderTimeline();
     } else if (tabName === 'received') {
+        currentReceivedPartnerId = null;
+        elements.receivedMessagesDetail.classList.add('hidden');
+        elements.receivedSendersList.classList.remove('hidden');
         renderReceivedMessages();
     } else if (tabName === 'sent') {
+        currentSentPartnerId = null;
+        elements.sentMessagesDetail.classList.add('hidden');
+        elements.sentRecipientsList.classList.remove('hidden');
         renderSentMessages();
     } else if (tabName === 'send') {
         // デフォルトでは宛先選択を有効化してリセット
@@ -528,8 +555,6 @@ function switchTab(tabName) {
             elements.recipientSelect.disabled = false;
             elements.recipientSelect.value = ''; // Reset selection
         }
-    } else if (tabName === 'friends') {
-        renderSentMessages();
     } else if (tabName === 'friends') {
         renderFollowingList();
         renderFollowerList();
@@ -1137,11 +1162,15 @@ function closeModal() {
 // メッセージカードのHTML生成
 // メッセージカードのHTML生成
 function createMessageCard(msg, type = 'sent') {
-    const date = new Date(msg.createdAt);
-    const timeString = formatDate(date);
+    const timeString = formatDate(msg.createdAt);
     const currentUser = getCurrentUser();
     const isOwnMessage = currentUser && msg.fromId === currentUser.userId;
     const ownMessageClass = isOwnMessage ? 'own-message' : '';
+
+    // 日時表示 (一番最初のメッセージ＝rootIdがない、またはスレッド表示以外、など状況によるが、
+    // ユーザーの要望は「枠の中に記載」なので、body内に移動。
+    // headerからは削除するか、条件に応じて残す。今回は要望通りbody内へ。)
+    const timeHtml = `<div class="message-time-inside">${timeString}</div>`;
 
     // 受信の場合は相手（自分）を表示しない
     let toHtml = '';
@@ -1199,11 +1228,11 @@ function createMessageCard(msg, type = 'sent') {
                     ${toHtml}
                     ${actionsHtml}
                 </div>
-                <span class="message-time">${timeString}</span>
             </div>
             <div class="message-body">
                 ${replyContextHtml}
                 ${escapeHtml(msg.message)}
+                ${timeHtml}
             </div>
         </div>
     `;
@@ -1226,42 +1255,73 @@ function renderReceivedMessages() {
         // Ensure detail view is hidden
         elements.receivedMessagesDetail.classList.add('hidden');
         elements.receivedSendersList.classList.remove('hidden');
+        currentReceivedPartnerId = null;
     } else {
-        // Group by Sender
-        const senderGroups = {};
-        messages.forEach(msg => {
-            if (!senderGroups[msg.fromId]) {
-                senderGroups[msg.fromId] = {
-                    name: msg.fromName,
-                    messages: [],
-                    latest: 0
+        const allMessages = getMessages();
+
+        // Partner based grouping for latest activity
+        const partnerGroups = {};
+
+        // 1. Group all messages (sent & received) by partner to find REAL latest activity
+        allMessages.forEach(msg => {
+            const partnerId = (msg.fromId === currentUser.userId) ? msg.toId : (msg.toId === currentUser.userId ? msg.fromId : null);
+            if (!partnerId) return;
+
+            if (!partnerGroups[partnerId]) {
+                partnerGroups[partnerId] = {
+                    latest: 0,
+                    unread: 0
                 };
             }
-            senderGroups[msg.fromId].messages.push(msg);
-            if (msg.createdAt > senderGroups[msg.fromId].latest) {
-                senderGroups[msg.fromId].latest = msg.createdAt;
+            if (msg.createdAt > partnerGroups[partnerId].latest) {
+                partnerGroups[partnerId].latest = msg.createdAt;
+            }
+            if (msg.toId === currentUser.userId && !msg.isRead) {
+                partnerGroups[partnerId].unread++;
             }
         });
 
-        // Convert to array and sort by latest message time descending
-        const sortedSenders = Object.keys(senderGroups).map(fromId => {
-            return { id: fromId, ...senderGroups[fromId] };
+        // 2. Map Received-only groupings for display, but use the activity sort from above
+        const groups = {};
+        messages.forEach(msg => {
+            if (!groups[msg.fromId]) {
+                groups[msg.fromId] = {
+                    name: msg.fromName,
+                    messages: [] // Filtered later by rootId
+                };
+            }
+            groups[msg.fromId].messages.push(msg);
+        });
+
+        // Convert to array and sort by the GLOBAL latest activity with that partner
+        const sortedPartners = Object.keys(groups).map(fromId => {
+            return {
+                id: fromId,
+                ...groups[fromId],
+                latest: partnerGroups[fromId] ? partnerGroups[fromId].latest : 0,
+                unreadCount: partnerGroups[fromId] ? partnerGroups[fromId].unread : 0
+            };
         }).sort((a, b) => b.latest - a.latest);
 
-        // Create Sender List HTML
-        const sendersHtml = sortedSenders.map(group => {
-            const count = group.messages.length;
+        // Create HTML
+        const sendersHtml = sortedPartners.map(group => {
+            const count = group.messages.filter(m => !m.rootId).length; // Root messages only
+            if (count === 0 && group.messages.length > 0) {
+                // If they only have replies, maybe we still want to show them? 
+                // But user said "don't show thread content". 
+                // Actually, if we only show rootId === null in details, the list should reflect that.
+            }
 
-            // Unread Logic
-            const hasUnread = group.messages.some(m => !m.isRead);
+            const hasUnread = group.unreadCount > 0;
             const unreadIndicator = hasUnread ? '<span class="unread-indicator"></span>' : '';
             const unreadStyle = hasUnread ? 'font-weight: bold; color: var(--text-primary);' : 'color: var(--text-secondary);';
+            const displayTime = formatDate(group.latest);
 
             return `
             <div class="user-card" onclick="showReceivedDetail('${group.id}')" style="cursor: pointer;">
                 <div class="user-info">
                     <span class="user-name">${escapeHtml(group.name)} ${unreadIndicator}</span>
-                    <span class="user-id" style="font-size: 12px; ${unreadStyle}">メッセージ ${count}件</span>
+                    <span class="user-id" style="font-size: 12px; ${unreadStyle}">やり取り ${displayTime}</span>
                 </div>
                 <div style="font-size: 20px; color: var(--pink-400);">
                     →
@@ -1272,24 +1332,30 @@ function renderReceivedMessages() {
 
         elements.receivedSendersList.innerHTML = sendersHtml;
 
-        // Ensure List View is active
-        elements.receivedSendersList.classList.remove('hidden');
-        elements.receivedMessagesDetail.classList.add('hidden');
+        // Ensure List View is active IF not in detail
+        if (elements.receivedMessagesDetail.classList.contains('hidden')) {
+            elements.receivedSendersList.classList.remove('hidden');
+        }
     }
 
-    // バッジを更新 (Count only unread)
-    const unreadCount = messages.filter(m => !m.isRead).length;
+    // バッジを更新 (Count only unread ROOT messages)
+    const unreadCount = messages.filter(m => !m.isRead && !m.rootId).length;
     updateReceivedBadge(unreadCount);
 }
 
 // Show Detail View for specific sender
 window.showReceivedDetail = function (fromId) {
+    currentReceivedPartnerId = fromId;
     const currentUser = getCurrentUser();
-    const messages = getReceivedMessages(currentUser.userId).filter(m => m.fromId === fromId);
+    // Filter: User partner AND rootId is null (starter messages only)
+    const messages = getReceivedMessages(currentUser.userId)
+        .filter(m => m.fromId === fromId && !m.rootId);
 
-    if (messages.length > 0) {
-        elements.detailSenderName.textContent = messages[0].fromName + 'さんからのメッセージ';
-        elements.detailMessagesList.innerHTML = messages.map(msg => createMessageCard(msg, 'received')).join('');
+    if (messages.length > 0 || true) { // Allow showing empty detail if all deleted
+        elements.detailSenderName.textContent = (messages.length > 0 ? messages[0].fromName : 'ユーザー') + 'さんからのメッセージ';
+        elements.detailMessagesList.innerHTML = messages.length > 0
+            ? messages.map(msg => createMessageCard(msg, 'received')).join('')
+            : '<p class="empty-state">メッセージがありません</p>';
 
         // Mark as Read
         markMessagesAsRead(currentUser.userId, fromId);
@@ -1322,6 +1388,7 @@ function markMessagesAsRead(userId, fromId) {
 
 // Back to List View
 window.backToReceivedList = function () {
+    currentReceivedPartnerId = null;
     renderReceivedMessages(); // Refresh list to update unread status/dots
     elements.receivedSendersList.classList.remove('hidden');
     elements.receivedMessagesDetail.classList.add('hidden');
@@ -1343,34 +1410,63 @@ function renderSentMessages() {
         `;
         elements.sentMessagesDetail.classList.add('hidden');
         elements.sentRecipientsList.classList.remove('hidden');
+        currentSentPartnerId = null;
     } else {
+        const allMessages = getMessages();
+
+        // GLOBAL activity grouping
+        const partnerGroups = {};
+        allMessages.forEach(msg => {
+            const partnerId = (msg.fromId === currentUser.userId) ? msg.toId : (msg.toId === currentUser.userId ? msg.fromId : null);
+            if (!partnerId) return;
+            if (!partnerGroups[partnerId]) partnerGroups[partnerId] = { latest: 0 };
+            if (msg.createdAt > partnerGroups[partnerId].latest) partnerGroups[partnerId].latest = msg.createdAt;
+        });
+
         // Group by Recipient
         const groups = {};
         messages.forEach(msg => {
             if (!groups[msg.toId]) {
                 groups[msg.toId] = {
                     name: msg.toName,
-                    messages: [],
-                    latest: 0
+                    messages: []
                 };
             }
             groups[msg.toId].messages.push(msg);
-            if (msg.createdAt > groups[msg.toId].latest) {
-                groups[msg.toId].latest = msg.createdAt;
-            }
         });
 
-        // Convert to array and sort by latest message time descending
+        // Sort by GLOBAL latest activity
         const sortedRecipients = Object.keys(groups).map(toId => {
-            return { id: toId, ...groups[toId] };
+            return {
+                id: toId,
+                ...groups[toId],
+                latest: partnerGroups[toId] ? partnerGroups[toId].latest : 0
+            };
         }).sort((a, b) => b.latest - a.latest);
 
+        // Create HTML
+        let totalUnreadSent = 0;
         const html = sortedRecipients.map(recipient => {
+            const displayTime = formatDate(recipient.latest);
+            const partnerId = recipient.id;
+
+            // Count unread replies specifically from this partner (only messages with rootId)
+            const unreadCount = allMessages.filter(m =>
+                m.toId === currentUser.userId &&
+                m.fromId === partnerId &&
+                !m.isRead &&
+                m.rootId // Only replies count here
+            ).length;
+
+            totalUnreadSent += unreadCount;
+            const unreadIndicator = unreadCount > 0 ? '<span class="unread-indicator"></span>' : '';
+            const unreadStyle = unreadCount > 0 ? 'font-weight: bold; color: var(--text-primary);' : 'color: var(--text-secondary);';
+
             return `
             <div class="user-card" onclick="showSentDetail('${recipient.id}')" style="cursor: pointer;">
                 <div class="user-info">
-                    <span class="user-name">${escapeHtml(recipient.name)}</span>
-                    <span class="user-id" style="font-size: 12px; color: var(--text-secondary);">メッセージ ${recipient.messages.length}件</span>
+                    <span class="user-name">${escapeHtml(recipient.name)} ${unreadIndicator}</span>
+                    <span class="user-id" style="font-size: 12px; ${unreadStyle}">やり取り ${displayTime}</span>
                 </div>
                 <div style="font-size: 20px; color: var(--blue-400);">
                     →
@@ -1380,19 +1476,33 @@ function renderSentMessages() {
         }).join('');
 
         elements.sentRecipientsList.innerHTML = html;
-        elements.sentRecipientsList.classList.remove('hidden');
-        elements.sentMessagesDetail.classList.add('hidden');
+
+        // Ensure List View is active IF not in detail
+        if (elements.sentMessagesDetail.classList.contains('hidden')) {
+            elements.sentRecipientsList.classList.remove('hidden');
+        }
+
+        // Update Sent Badge
+        updateSentBadge(totalUnreadSent);
     }
 }
 
 // Show Detail View for specific recipient
 window.showSentDetail = function (toId) {
+    currentSentPartnerId = toId;
     const currentUser = getCurrentUser();
-    const messages = getSentMessages(currentUser.userId).filter(m => m.toId === toId);
+    // Filter: User partner AND rootId is null
+    const messages = getSentMessages(currentUser.userId)
+        .filter(m => m.toId === toId && !m.rootId);
 
-    if (messages.length > 0) {
-        elements.detailRecipientName.textContent = messages[0].toName + 'さんへのメッセージ';
-        elements.detailSentMessagesList.innerHTML = messages.map(msg => createMessageCard(msg, 'sent')).join('');
+    if (messages.length > 0 || true) {
+        elements.detailRecipientName.textContent = (messages.length > 0 ? messages[0].toName : 'ユーザー') + 'さんへのメッセージ';
+        elements.detailSentMessagesList.innerHTML = messages.length > 0
+            ? messages.map(msg => createMessageCard(msg, 'sent')).join('')
+            : '<p class="empty-state">メッセージがありません</p>';
+
+        // Mark replies as Read
+        markMessagesAsRead(currentUser.userId, toId);
 
         elements.sentRecipientsList.classList.add('hidden');
         elements.sentMessagesDetail.classList.remove('hidden');
@@ -1400,6 +1510,8 @@ window.showSentDetail = function (toId) {
 };
 
 window.backToSentList = function () {
+    currentSentPartnerId = null;
+    renderSentMessages(); // Refresh list to update dots/badges
     elements.sentRecipientsList.classList.remove('hidden');
     elements.sentMessagesDetail.classList.add('hidden');
 };
@@ -1415,8 +1527,13 @@ function renderTimeline() {
     // 全メッセージを取得
     let messages = getMessages();
 
-    // ブロックしている/されているユーザーのメッセージを除外
+    // フィルタリング:
+    // 1. 自分に関係のあるメッセージ (自分が送信者または受信者)
+    // 2. スレッドの親メッセージのみ (rootIdがないもの)
+    // 3. ブロックユーザーの除外
     messages = messages.filter(m =>
+        (m.fromId === currentUser.userId || m.toId === currentUser.userId) &&
+        !m.rootId &&
         !blockedIds.includes(m.fromId) &&
         !blockedIds.includes(m.toId)
     );
@@ -1436,11 +1553,22 @@ function renderTimeline() {
 
 // 受信バッジを更新
 function updateReceivedBadge(count) {
+    if (!elements.receivedBadge) return;
     if (count > 0) {
         elements.receivedBadge.textContent = count;
         elements.receivedBadge.classList.remove('hidden');
     } else {
         elements.receivedBadge.classList.add('hidden');
+    }
+}
+
+function updateSentBadge(count) {
+    if (!elements.sentBadge) return;
+    if (count > 0) {
+        elements.sentBadge.textContent = count;
+        elements.sentBadge.classList.remove('hidden');
+    } else {
+        elements.sentBadge.classList.add('hidden');
     }
 }
 
@@ -1687,12 +1815,31 @@ function initialize() {
         elements.currentUserBadge.onclick = () => showUserProfile(currentUser.userId);
 
         updateRecipientOptions();
+
+        // Tab switch should clear detail state usually, or at least show the list
+        currentReceivedPartnerId = null;
+        currentSentPartnerId = null;
+
         switchTab('timeline'); // Default to timeline tab
 
-        // 受信メッセージ数を更新 (Unread only)
-        const myMessages = getReceivedMessages(currentUser.userId);
-        const unreadCount = myMessages.filter(m => !m.isRead).length;
-        updateReceivedBadge(unreadCount);
+        // 受信メッセージ数を更新 (Unread ROOT only)
+        const myReceived = getReceivedMessages(currentUser.userId);
+        updateReceivedBadge(myReceived.filter(m => !m.isRead && !m.rootId).length);
+
+        // 送信メッセージへの返信数を更新 (Unread REPLIES only)
+        const allMsgs = getMessages();
+        const sentMsgs = getSentMessages(currentUser.userId);
+        const uniqueRecipients = [...new Set(sentMsgs.map(m => m.toId))];
+        let unreadReplies = 0;
+        uniqueRecipients.forEach(rId => {
+            unreadReplies += allMsgs.filter(m =>
+                m.toId === currentUser.userId &&
+                m.fromId === rId &&
+                !m.isRead &&
+                m.rootId
+            ).length;
+        });
+        updateSentBadge(unreadReplies);
     }
 }
 
