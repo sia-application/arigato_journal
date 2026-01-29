@@ -578,7 +578,7 @@ function updateRecipientOptions() {
         .filter(u => followingIds.includes(u.userId))
         .filter(u => !blocked.includes(u.userId));
 
-    elements.recipientSelect.innerHTML = '<option value="">ありがとうのメッセージを送る相手を選択</option>';
+    elements.recipientSelect.innerHTML = '<option value="">送る相手を選択</option>';
     users.forEach(user => {
         const option = document.createElement('option');
         option.value = user.userId;

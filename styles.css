@@ -59,6 +59,16 @@
 /* ============================
    リセット・基本スタイル
    ============================ */
+.mobile-break {
+    display: none;
+}
+
+@media screen and (max-width: 480px) {
+    .mobile-break {
+        display: block;
+    }
+}
+
 *,
 *::before,
 *::after {
@@ -1615,6 +1625,7 @@ body::after {
     position: relative;
     /* For overlay positioning */
 }
+
 /* ============================
    レスポンシブ対応 (iPhone/Mobile)
    ============================ */
@@ -1687,7 +1698,7 @@ body::after {
         gap: 4px;
         min-width: unset;
     }
-    
+
     .tab-icon {
         font-size: 16px;
     }
@@ -1714,22 +1725,21 @@ body::after {
 
     .message-users {
         width: 100%;
-        justify-content: space-between;
+        justify-content: flex-start;
     }
-    
-    .message-actions-sent {
-        margin-top: 8px;
-        align-self: flex-end;
-        width: 100%;
-        justify-content: flex-end;
+
+    .own-message .message-users {
+        flex-wrap: wrap;
     }
-    
+
+    /* .message-actions-sent removed to allow inline flow */
+
     /* モーダル */
     .modal-content {
         width: 95%;
         padding: 20px;
         max-height: 85vh;
-        overflow-y: auto; 
+        overflow-y: auto;
     }
 
     .profile-avatar {
@@ -1737,9 +1747,18 @@ body::after {
         height: 80px;
         font-size: 32px;
     }
-    
+
     .avatar-overlay {
         width: 80px;
         height: 80px;
+    }
+
+    /* トースト通知 */
+    .toast {
+        width: 90%;
+        max-width: 400px;
+        justify-content: center;
+        text-align: center;
+        padding: 16px;
     }
 }
