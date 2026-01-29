@@ -17,10 +17,11 @@ const STORAGE_KEYS = {
 function initializeData() {
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
         // デモ用の初期ユーザー
+
         const initialUsers = [
-            { id: 'user1', name: 'さくら', password: 'password', createdAt: Date.now() },
-            { id: 'user2', name: 'たける', password: 'password', createdAt: Date.now() },
-            { id: 'user3', name: 'あおい', password: 'password', createdAt: Date.now() }
+            { userId: 'user1', name: 'さくら', password: 'password', createdAt: Date.now() },
+            { userId: 'user2', name: 'たける', password: 'password', createdAt: Date.now() },
+            { userId: 'user3', name: 'あおい', password: 'password', createdAt: Date.now() }
         ];
         localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
     }
@@ -62,16 +63,19 @@ function saveUsers(users) {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
 }
 
-function findUser(name) {
-    return getUsers().find(u => u.name === name);
+function findUser(userId) {
+    return getUsers().find(u => u.userId === userId);
 }
 
-function createUser(name, password) {
+function createUser(userId, name, password) {
     const users = getUsers();
     const newUser = {
-        id: 'user_' + Date.now(),
+        userId: userId,
         name: name,
         password: password,
+        bio: '', // 自己紹介
+        avatar: '👤', // プロフィール画像
+        following: [], // フォローリスト
         createdAt: Date.now()
     };
     users.push(newUser);
@@ -101,19 +105,18 @@ function saveMessages(messages) {
     localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
 }
 
-function sendMessage(toId, toName, message, isPublic) {
+function sendMessage(toId, toName, message) {
     const currentUser = getCurrentUser();
     if (!currentUser) return null;
 
     const messages = getMessages();
     const newMessage = {
         id: 'msg_' + Date.now(),
-        fromId: currentUser.id,
+        fromId: currentUser.userId,
         fromName: currentUser.name,
         toId: toId,
         toName: toName,
         message: message,
-        isPublic: isPublic,
         createdAt: Date.now()
     };
     messages.unshift(newMessage);
@@ -125,13 +128,63 @@ function getReceivedMessages(userId) {
     return getMessages().filter(m => m.toId === userId);
 }
 
-function getSentMessages(userId) {
-    return getMessages().filter(m => m.fromId === userId);
+// フォロー機能
+function followUser(targetUserId) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    // 自身のデータ更新
+    if (!currentUser.following) currentUser.following = [];
+    if (!currentUser.following.includes(targetUserId)) {
+        currentUser.following.push(targetUserId);
+
+        // ローカルストレージ内の全ユーザーデータも更新
+        const users = getUsers();
+        const index = users.findIndex(u => u.userId === currentUser.userId);
+        if (index !== -1) {
+            users[index] = currentUser;
+            saveUsers(users);
+        }
+        setCurrentUser(currentUser);
+    }
 }
 
-function getPublicMessages() {
-    return getMessages().filter(m => m.isPublic);
+function unfollowUser(targetUserId) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    if (currentUser.following && currentUser.following.includes(targetUserId)) {
+        currentUser.following = currentUser.following.filter(id => id !== targetUserId);
+
+        // ローカルストレージ内の全ユーザーデータも更新
+        const users = getUsers();
+        const index = users.findIndex(u => u.userId === currentUser.userId);
+        if (index !== -1) {
+            users[index] = currentUser;
+            saveUsers(users);
+        }
+        setCurrentUser(currentUser);
+    }
 }
+
+// フォロワー数を取得
+function getFollowerCount(userId) {
+    const users = getUsers();
+    return users.filter(u => u.following && u.following.includes(userId)).length;
+}
+
+// フォロー数を取得
+function getFollowingCount(userId) {
+    const user = findUser(userId);
+    return user && user.following ? user.following.length : 0;
+}
+
+function isFollowing(targetUserId) {
+    const currentUser = getCurrentUser();
+    return currentUser && currentUser.following && currentUser.following.includes(targetUserId);
+}
+
+
 
 // ============================
 // UI 管理
@@ -141,6 +194,7 @@ const elements = {};
 
 function initializeElements() {
     elements.loginScreen = document.getElementById('login-screen');
+    elements.registerScreen = document.getElementById('register-screen');
     elements.mainScreen = document.getElementById('main-screen');
 
     // ページによって、存在する要素だけ取得
@@ -148,6 +202,13 @@ function initializeElements() {
         elements.loginForm = document.getElementById('login-form');
         elements.usernameInput = document.getElementById('username');
         elements.passwordInput = document.getElementById('password');
+    }
+
+    if (elements.registerScreen) {
+        elements.registerForm = document.getElementById('register-form');
+        elements.regUserIdInput = document.getElementById('reg-userid');
+        elements.regUsernameInput = document.getElementById('reg-username');
+        elements.regPasswordInput = document.getElementById('reg-password');
     }
 
     if (elements.mainScreen) {
@@ -158,22 +219,33 @@ function initializeElements() {
         elements.sendForm = document.getElementById('send-form');
         elements.recipientSelect = document.getElementById('recipient');
         elements.messageInput = document.getElementById('message');
-        elements.isPublicCheckbox = document.getElementById('is-public');
         elements.receivedMessages = document.getElementById('received-messages');
         elements.sentMessages = document.getElementById('sent-messages');
-        elements.timelineMessages = document.getElementById('timeline-messages');
         elements.receivedBadge = document.getElementById('received-badge');
+
+        // Search & Friends
+        elements.searchUserIdInput = document.getElementById('search-userid');
+        elements.searchBtn = document.getElementById('search-btn');
+        elements.searchResult = document.getElementById('search-result');
+        elements.followingList = document.getElementById('following-list');
+
+        // Profile Modal
+        elements.profileModal = document.getElementById('profile-modal');
+        elements.closeModal = elements.profileModal.querySelector('.close-modal');
+        elements.modalUsername = document.getElementById('modal-username');
+        elements.modalUserid = document.getElementById('modal-userid');
+        elements.profileAvatarDisplay = document.getElementById('profile-avatar-display');
+        elements.avatarEdit = document.getElementById('avatar-edit');
+        elements.followingCount = document.getElementById('following-count');
+        elements.followerCount = document.getElementById('follower-count');
+        elements.bioDisplay = document.getElementById('bio-display');
+        elements.bioEdit = document.getElementById('bio-edit');
+        elements.modalActionBtn = document.getElementById('modal-action-btn');
+        elements.modalEditBtn = document.getElementById('modal-edit-btn');
+        elements.modalSaveBtn = document.getElementById('modal-save-btn');
+        elements.modalCancelBtn = document.getElementById('modal-cancel-btn');
     }
 
-    elements.toast = document.getElementById('toast');
-    elements.sendForm = document.getElementById('send-form');
-    elements.recipientSelect = document.getElementById('recipient');
-    elements.messageInput = document.getElementById('message');
-    elements.isPublicCheckbox = document.getElementById('is-public');
-    elements.receivedMessages = document.getElementById('received-messages');
-    elements.sentMessages = document.getElementById('sent-messages');
-    elements.timelineMessages = document.getElementById('timeline-messages');
-    elements.receivedBadge = document.getElementById('received-badge');
     elements.toast = document.getElementById('toast');
 }
 
@@ -199,24 +271,250 @@ function switchTab(tabName) {
         renderReceivedMessages();
     } else if (tabName === 'sent') {
         renderSentMessages();
-    } else if (tabName === 'timeline') {
-        renderTimelineMessages();
+    } else if (tabName === 'friends') {
+        renderFollowingList();
     }
 }
 
-// 宛先選択肢を更新
+// 宛先選択肢を更新（フォロー中のユーザーのみ）
 function updateRecipientOptions() {
     const currentUser = getCurrentUser();
-    const users = getUsers().filter(u => u.id !== currentUser?.id);
+    if (!currentUser) return;
+
+    // 自身以外の全ユーザー
+    const allUsers = getUsers().filter(u => u.userId !== currentUser.userId);
+
+    // フォロー中のユーザーIDリスト
+    const followingIds = currentUser.following || [];
+
+    // フォロー中のユーザーのみフィルタリング
+    const users = allUsers.filter(u => followingIds.includes(u.userId));
 
     elements.recipientSelect.innerHTML = '<option value="">送りたい相手を選択</option>';
     users.forEach(user => {
         const option = document.createElement('option');
-        option.value = user.id;
+        option.value = user.userId;
         option.textContent = user.name;
         option.dataset.name = user.name;
         elements.recipientSelect.appendChild(option);
     });
+}
+
+function renderSearchResult(user) {
+    elements.searchResult.innerHTML = '';
+
+    if (!user) {
+        elements.searchResult.innerHTML = '<p style="text-align:center; color:var(--text-secondary);">ユーザーが見つかりませんでした</p>';
+        return;
+    }
+
+    if (user.userId === getCurrentUser().userId) {
+        elements.searchResult.innerHTML = '<p style="text-align:center; color:var(--text-secondary);">自分自身は検索結果に表示されません</p>';
+        return;
+    }
+
+    const isFollowed = isFollowing(user.userId);
+    const btnText = isFollowed ? 'フォロー中' : 'フォローする';
+    const btnClass = isFollowed ? 'follow-btn following' : 'follow-btn';
+
+    const html = `
+        <div class="user-card">
+            <div class="user-info">
+                <span class="user-name user-link" onclick="showUserProfile('${user.userId}')">${escapeHtml(user.name)}</span>
+                <span class="user-id">@${escapeHtml(user.userId)}</span>
+            </div>
+            <button class="${btnClass}" onclick="toggleFollow('${user.userId}')">${btnText}</button>
+        </div>
+    `;
+
+    elements.searchResult.innerHTML = html;
+}
+
+function renderFollowingList() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    const followingIds = currentUser.following || [];
+    const allUsers = getUsers();
+    const followingUsers = allUsers.filter(u => followingIds.includes(u.userId));
+
+    if (followingUsers.length === 0) {
+        elements.followingList.innerHTML = `
+            <div class="empty-state">
+                <span class="empty-icon">👥</span>
+                <p>まだフォローしている人はいません</p>
+            </div>
+        `;
+    } else {
+        elements.followingList.innerHTML = followingUsers.map(user => `
+            <div class="user-card">
+                <div class="user-info">
+                    <span class="user-name user-link" onclick="showUserProfile('${user.userId}')">${escapeHtml(user.name)}</span>
+                    <span class="user-id">@${escapeHtml(user.userId)}</span>
+                </div>
+                <button class="follow-btn following" onclick="toggleFollow('${user.userId}')">フォロー中</button>
+            </div>
+        `).join('');
+    }
+}
+
+// グローバル関数として公開（HTMLからonclickで呼ぶため）
+window.toggleFollow = function (targetUserId) {
+    if (isFollowing(targetUserId)) {
+        unfollowUser(targetUserId);
+    } else {
+        followUser(targetUserId);
+    }
+
+    // UI更新
+    const searchedUser = findUser(targetUserId); // 検索結果の表示更新用
+    const searchInputVal = elements.searchUserIdInput.value.trim();
+    if (searchInputVal === targetUserId) {
+        renderSearchResult(searchedUser);
+    }
+    renderFollowingList();
+    updateRecipientOptions(); // 宛先リストも更新
+};
+
+// プロフィール表示
+window.showUserProfile = function (userId) {
+    const user = findUser(userId);
+    const currentUser = getCurrentUser();
+
+    if (!user || !currentUser) return;
+
+    const isMe = user.userId === currentUser.userId;
+    const isFollowed = !isMe && isFollowing(user.userId);
+
+    // UI設定
+    elements.modalUsername.textContent = user.name;
+    elements.modalUserid.textContent = '@' + user.userId;
+
+    // Bio表示
+    if (user.bio) {
+        elements.bioDisplay.innerHTML = `<p>${escapeHtml(user.bio)}</p>`;
+    } else {
+        elements.bioDisplay.innerHTML = `<p class="placeholder-text">自己紹介はまだありません</p>`;
+    }
+    elements.bioEdit.value = user.bio || '';
+
+    // 表示モードリセット
+    elements.bioDisplay.classList.remove('hidden');
+    elements.bioEdit.classList.add('hidden');
+
+    // ボタン制御
+    if (isMe) {
+        elements.modalActionBtn.classList.add('hidden');
+        elements.modalEditBtn.classList.remove('hidden');
+        elements.modalSaveBtn.classList.add('hidden');
+        elements.modalCancelBtn.classList.add('hidden');
+    } else {
+        elements.modalActionBtn.classList.remove('hidden');
+        elements.modalEditBtn.classList.add('hidden');
+        elements.modalSaveBtn.classList.add('hidden');
+        elements.modalCancelBtn.classList.add('hidden');
+
+        updateFollowButton(user.userId);
+    }
+
+    // ボタンのイベントリスナー再設定（クローンして置換することで重複防止）
+    replaceButtonListener(elements.modalActionBtn, () => {
+        window.toggleFollow(user.userId);
+        updateFollowButton(user.userId);
+        // 検索結果やリストの表示も同期させるために再描画
+        if (elements.searchUserIdInput.value === user.userId) {
+            renderSearchResult(user);
+        }
+        renderFollowingList();
+    });
+
+    // モーダル表示
+    elements.profileModal.classList.remove('hidden');
+    setTimeout(() => elements.profileModal.classList.add('show'), 10);
+};
+
+function updateFollowButton(userId) {
+    const isFollowed = isFollowing(userId);
+    elements.modalActionBtn.textContent = isFollowed ? 'フォロー中' : 'フォローする';
+    if (isFollowed) {
+        elements.modalActionBtn.classList.add('following');
+    } else {
+        elements.modalActionBtn.classList.remove('following');
+    }
+}
+
+function replaceButtonListener(element, callback) {
+    const newElement = element.cloneNode(true);
+    element.parentNode.replaceChild(newElement, element);
+    newElement.addEventListener('click', callback);
+    // 参照を更新
+    if (newElement.id === 'modal-action-btn') elements.modalActionBtn = newElement;
+}
+
+// プロフィール編集モード
+function enableEditProfile() {
+    elements.bioDisplay.classList.add('hidden');
+    elements.bioEdit.classList.remove('hidden');
+
+    elements.profileAvatarDisplay.classList.add('hidden');
+    elements.avatarEdit.classList.remove('hidden');
+
+    elements.modalEditBtn.classList.add('hidden');
+    elements.modalSaveBtn.classList.remove('hidden');
+    elements.modalCancelBtn.classList.remove('hidden');
+    elements.bioEdit.focus();
+}
+
+function saveProfile() {
+    const newBio = elements.bioEdit.value.trim();
+    const newAvatar = elements.avatarEdit.value.trim();
+
+    const updatedUser = updateProfile(newBio, newAvatar);
+
+    if (updatedUser) {
+        // 表示更新
+        if (updatedUser.bio) {
+            elements.bioDisplay.innerHTML = `<p>${escapeHtml(updatedUser.bio)}</p>`;
+        } else {
+            elements.bioDisplay.innerHTML = `<p class="placeholder-text">自己紹介はまだありません</p>`;
+        }
+
+        elements.profileAvatarDisplay.textContent = updatedUser.avatar || '👤';
+
+        elements.bioDisplay.classList.remove('hidden');
+        elements.bioEdit.classList.add('hidden');
+        elements.profileAvatarDisplay.classList.remove('hidden');
+        elements.avatarEdit.classList.add('hidden');
+
+        elements.modalEditBtn.classList.remove('hidden');
+        elements.modalSaveBtn.classList.add('hidden');
+        elements.modalCancelBtn.classList.add('hidden');
+
+        showToast('プロフィールを更新しました');
+    }
+}
+
+function cancelEditProfile() {
+    elements.bioDisplay.classList.remove('hidden');
+    elements.bioEdit.classList.add('hidden');
+    elements.profileAvatarDisplay.classList.remove('hidden');
+    elements.avatarEdit.classList.add('hidden');
+
+    elements.modalEditBtn.classList.remove('hidden');
+    elements.modalSaveBtn.classList.add('hidden');
+    elements.modalCancelBtn.classList.add('hidden');
+
+    // 元の値に戻す
+    const currentUser = getCurrentUser();
+    elements.bioEdit.value = currentUser.bio || '';
+    elements.avatarEdit.value = currentUser.avatar || '👤';
+}
+
+function closeModal() {
+    elements.profileModal.classList.remove('show');
+    setTimeout(() => {
+        elements.profileModal.classList.add('hidden');
+    }, 300);
 }
 
 // メッセージカードのHTML生成
@@ -228,16 +526,15 @@ function createMessageCard(msg) {
         <div class="message-card">
             <div class="message-header">
                 <div class="message-users">
-                    <span class="message-from">${escapeHtml(msg.fromName)}</span>
+                    <span class="message-from user-link" onclick="showUserProfile('${escapeHtml(msg.fromId)}')">${escapeHtml(msg.fromName)}</span>
                     <span class="message-arrow">→</span>
-                    <span class="message-to">${escapeHtml(msg.toName)}</span>
+                    <span class="message-to user-link" onclick="showUserProfile('${escapeHtml(msg.toId)}')">${escapeHtml(msg.toName)}</span>
                 </div>
                 <span class="message-time">${timeString}</span>
             </div>
             <div class="message-body">
                 ${escapeHtml(msg.message)}
             </div>
-            ${msg.isPublic ? '<div class="message-public">🌐 公開メッセージ</div>' : ''}
         </div>
     `;
 }
@@ -247,7 +544,7 @@ function renderReceivedMessages() {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
 
-    const messages = getReceivedMessages(currentUser.id);
+    const messages = getReceivedMessages(currentUser.userId);
 
     if (messages.length === 0) {
         elements.receivedMessages.innerHTML = `
@@ -269,7 +566,7 @@ function renderSentMessages() {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
 
-    const messages = getSentMessages(currentUser.id);
+    const messages = getSentMessages(currentUser.userId);
 
     if (messages.length === 0) {
         elements.sentMessages.innerHTML = `
@@ -283,21 +580,6 @@ function renderSentMessages() {
     }
 }
 
-// タイムラインを表示
-function renderTimelineMessages() {
-    const messages = getPublicMessages();
-
-    if (messages.length === 0) {
-        elements.timelineMessages.innerHTML = `
-            <div class="empty-state">
-                <span class="empty-icon">🌸</span>
-                <p>まだ公開されたメッセージはありません</p>
-            </div>
-        `;
-    } else {
-        elements.timelineMessages.innerHTML = messages.map(createMessageCard).join('');
-    }
-}
 
 // 受信バッジを更新
 function updateReceivedBadge(count) {
@@ -361,42 +643,57 @@ function formatDate(date) {
 
 function handleLogin(e) {
     e.preventDefault();
-    const username = elements.usernameInput.value.trim();
+    const userId = elements.usernameInput.value.trim(); // ユーザー名入力欄をID入力欄として使用
     const password = elements.passwordInput.value.trim();
 
-    if (!username || !password) {
-        showToast('ユーザー名とパスワードを入力してください');
+    if (!userId || !password) {
+        showToast('ユーザーIDとパスワードを入力してください');
         return;
     }
 
-    // 既存ユーザーを検索、なければ作成
-    let user = findUser(username);
+    // ユーザーを検索
+    let user = findUser(userId);
     if (!user) {
-        user = createUser(username, password);
-        showToast(`ようこそ、${username}さん！`);
+        showToast('ユーザーIDまたはパスワードが間違っています'); // セキュリティのため詳細は伏せる
+        return;
     } else {
         // パスワード確認
         if (user.password && user.password !== password) {
-            showToast('パスワードが間違っています');
+            showToast('ユーザーIDまたはパスワードが間違っています');
             return;
         }
-        // 古いユーザーデータでパスワードがない場合の互換性対応（今回は簡易的にスルーまたは保存）
-        if (!user.password) {
-            user.password = password; // 初回移行として保存
-            const users = getUsers();
-            const index = users.findIndex(u => u.id === user.id);
-            if (index !== -1) {
-                users[index] = user;
-                saveUsers(users);
-            }
-        }
 
-        showToast(`おかえりなさい、${username}さん！`);
+        showToast(`おかえりなさい、${user.name}さん！`);
     }
 
     setCurrentUser(user);
 
     // ページ遷移
+    setTimeout(() => {
+        window.location.href = 'top.html';
+    }, 1000);
+}
+
+function handleRegister(e) {
+    e.preventDefault();
+    const userId = elements.regUserIdInput.value.trim();
+    const username = elements.regUsernameInput.value.trim();
+    const password = elements.regPasswordInput.value.trim();
+
+    if (!userId || !username || !password) {
+        showToast('すべての項目を入力してください');
+        return;
+    }
+
+    // 重複チェック
+    if (findUser(userId)) {
+        showToast('このユーザーIDは既に使用されています');
+        return;
+    }
+
+    const newUser = createUser(userId, username, password);
+    setCurrentUser(newUser);
+
     showToast(`ようこそ、${username}さん！`);
     setTimeout(() => {
         window.location.href = 'top.html';
@@ -408,18 +705,26 @@ function handleLogout() {
     window.location.href = 'index.html';
 }
 
+function handleSearch() {
+    const userId = elements.searchUserIdInput.value.trim();
+    if (!userId) return;
+
+    const user = findUser(userId);
+    renderSearchResult(user);
+}
+
 function handleSendMessage(e) {
     e.preventDefault();
+
 
     const recipientId = elements.recipientSelect.value;
     const recipientOption = elements.recipientSelect.options[elements.recipientSelect.selectedIndex];
     const recipientName = recipientOption.dataset.name;
     const message = elements.messageInput.value.trim();
-    const isPublic = elements.isPublicCheckbox.checked;
 
     if (!recipientId || !message) return;
 
-    const newMessage = sendMessage(recipientId, recipientName, message, isPublic);
+    const newMessage = sendMessage(recipientId, recipientName, message);
 
     if (newMessage) {
         showToast(`${recipientName}さんに感謝を送りました！`);
@@ -448,19 +753,33 @@ function initialize() {
         elements.loginForm.addEventListener('submit', handleLogin);
     }
 
+    if (elements.registerForm) {
+        elements.registerForm.addEventListener('submit', handleRegister);
+    }
+
     if (elements.mainScreen) {
         elements.logoutBtn.addEventListener('click', handleLogout);
         elements.sendForm.addEventListener('submit', handleSendMessage);
+        elements.searchBtn.addEventListener('click', handleSearch);
         elements.tabBtns.forEach(btn => {
             btn.addEventListener('click', handleTabClick);
         });
+
+        // Modal Events
+        elements.closeModal.addEventListener('click', closeModal);
+        elements.profileModal.addEventListener('click', (e) => {
+            if (e.target === elements.profileModal) closeModal();
+        });
+        elements.modalEditBtn.addEventListener('click', enableEditProfile);
+        elements.modalSaveBtn.addEventListener('click', saveProfile);
+        elements.modalCancelBtn.addEventListener('click', cancelEditProfile);
     }
 
     // ログイン状態を確認とリダイレクト
     const currentUser = getCurrentUser();
 
-    // ログイン画面での処理
-    if (document.getElementById('login-screen')) {
+    // ログイン画面または登録画面での処理
+    if (document.getElementById('login-screen') || document.getElementById('register-screen')) {
         if (currentUser) {
             // ログイン済みならトップへ
             window.location.href = 'top.html';
@@ -476,11 +795,15 @@ function initialize() {
         }
 
         elements.currentUserBadge.textContent = currentUser.name;
+        // 自分の名前をクリックしたらプロフィール表示
+        elements.currentUserBadge.classList.add('user-link');
+        elements.currentUserBadge.onclick = () => showUserProfile(currentUser.userId);
+
         updateRecipientOptions();
         switchTab('send');
 
         // 受信メッセージ数を更新
-        const receivedCount = getReceivedMessages(currentUser.id).length;
+        const receivedCount = getReceivedMessages(currentUser.userId).length;
         updateReceivedBadge(receivedCount);
     }
 }

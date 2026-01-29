@@ -46,9 +46,9 @@
                     <span class="tab-icon">📤</span>
                     <span>送信済み</span>
                 </button>
-                <button class="tab-btn" data-tab="timeline">
-                    <span class="tab-icon">🌐</span>
-                    <span>タイムライン</span>
+                <button class="tab-btn" data-tab="friends">
+                    <span class="tab-icon">🔍</span>
+                    <span>ともだち</span>
                 </button>
             </nav>
 
@@ -66,13 +66,6 @@
                         <div class="input-group">
                             <label for="message">メッセージ</label>
                             <textarea id="message" rows="4" placeholder="感謝の気持ちを書いてみましょう..." required></textarea>
-                        </div>
-                        <div class="input-group checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="is-public" checked>
-                                <span class="checkmark"></span>
-                                <span>タイムラインに公開する</span>
-                            </label>
                         </div>
                         <button type="submit" class="btn btn-primary btn-large">
                             <span>💖 感謝を送る</span>
@@ -107,18 +100,33 @@
                 </div>
             </div>
 
-            <!-- タイムライン タブ -->
-            <div id="tab-timeline" class="tab-content">
-                <div class="messages-container">
-                    <h2 class="section-title">みんなの感謝</h2>
-                    <div id="timeline-messages" class="messages-list">
+            <!-- ともだち タブ -->
+            <div id="tab-friends" class="tab-content">
+                <div class="card">
+                    <h2 class="card-title">ともだちを探す</h2>
+                    <div class="search-container">
+                        <div class="input-group search-group">
+                            <input type="text" id="search-userid" placeholder="ユーザーIDを入力">
+                            <button id="search-btn" class="btn btn-primary">検索</button>
+                        </div>
+                    </div>
+                    <div id="search-result" class="search-result">
+                        <!-- 検索結果がここに表示されます -->
+                    </div>
+                </div>
+
+                <div class="messages-container" style="margin-top: 24px;">
+                    <h2 class="section-title">フォロー中</h2>
+                    <div id="following-list" class="messages-list">
+                        <!-- フォロー中のユーザーがここに表示されます -->
                         <div class="empty-state">
-                            <span class="empty-icon">🌸</span>
-                            <p>まだ公開されたメッセージはありません</p>
+                            <span class="empty-icon">👥</span>
+                            <p>まだフォローしている人はいません</p>
                         </div>
                     </div>
                 </div>
             </div>
+
         </main>
     </div>
 
@@ -126,6 +134,47 @@
     <div id="toast" class="toast hidden">
         <span class="toast-icon">✓</span>
         <span class="toast-message"></span>
+    </div>
+
+    <!-- プロフィールモーダル -->
+    <div id="profile-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div class="profile-header">
+                <div id="profile-avatar-display" class="profile-avatar">👤</div>
+                <input type="text" id="avatar-edit" class="avatar-input hidden" placeholder="👤" maxlength="2">
+                <h2 id="modal-username">User Name</h2>
+                <p id="modal-userid" class="profile-userid">@userid</p>
+
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <span id="following-count" class="stat-value">0</span>
+                        <span class="stat-label">フォロー</span>
+                    </div>
+                    <div class="stat-item">
+                        <span id="follower-count" class="stat-value">0</span>
+                        <span class="stat-label">フォロワー</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-body">
+                <div class="profile-section">
+                    <h3>自己紹介</h3>
+                    <div id="bio-display" class="bio-text">
+                        <p class="placeholder-text">自己紹介はまだありません</p>
+                    </div>
+                    <textarea id="bio-edit" class="bio-textarea hidden" placeholder="自己紹介を入力してください..."></textarea>
+                </div>
+
+                <div class="profile-actions">
+                    <button id="modal-action-btn" class="btn btn-primary">フォローする</button>
+                    <button id="modal-edit-btn" class="btn btn-secondary hidden">編集する</button>
+                    <button id="modal-save-btn" class="btn btn-primary hidden">保存する</button>
+                    <button id="modal-cancel-btn" class="btn btn-outline hidden">キャンセル</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>
