@@ -587,6 +587,10 @@ body::after {
     content: '🔍';
 }
 
+.send-card .card-title::before {
+    content: '✉️';
+}
+
 .send-card form {
     display: flex;
     flex-direction: column;
@@ -602,6 +606,21 @@ body::after {
     margin-bottom: 20px;
     padding-bottom: 12px;
     border-bottom: 2px solid var(--pink-200);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#tab-timeline .section-title::before {
+    content: '🕒';
+}
+
+#tab-received .section-title::before {
+    content: '📬';
+}
+
+#tab-sent .section-title::before {
+    content: '📤';
 }
 
 .section-toggle .toggle-icon {

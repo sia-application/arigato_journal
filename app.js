@@ -1881,21 +1881,10 @@ function initialize() {
             });
         }
 
-        // Search Section Toggle
         if (elements.searchSectionToggle) {
             elements.searchSectionToggle.addEventListener('click', () => {
-                elements.searchSectionToggle.classList.toggle('collapsed');
-                // For search section, we might need a utility class or specific style for collapsing
-                // borrowing .collapsed logic from styles.css which hides display: none
-                elements.searchSectionToggle.classList.toggle('collapsed-rotate'); // Rotate icon specific? Or generic?
-                // Re-using .section-toggle logic requires the parent class
-                if (elements.searchSectionContent.style.display === 'none') {
-                    elements.searchSectionContent.style.display = 'block';
-                    elements.searchSectionContent.classList.remove('collapsed');
-                } else {
-                    elements.searchSectionContent.style.display = 'none';
-                    elements.searchSectionToggle.classList.add('collapsed');
-                }
+                const isCollapsed = elements.searchSectionToggle.classList.toggle('collapsed');
+                elements.searchSectionContent.style.display = isCollapsed ? 'none' : 'block';
             });
         }
 
