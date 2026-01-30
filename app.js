@@ -384,6 +384,8 @@ function updateAllBadges(messagesInput) {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
 
+    const blocked = currentUser.blocked || [];
+
     // Received Unread (Root messages only)
     const receivedUnread = messages.filter(m =>
         m.toId === currentUser.userId &&
