@@ -1077,6 +1077,14 @@ function initialize() {
             return;
         }
 
+        // Display Current User Name
+        if (elements.currentUserBadge) {
+            elements.currentUserBadge.textContent = currentUser.name;
+            elements.currentUserBadge.addEventListener('click', () => {
+                renderProfileModal(currentUser);
+            });
+        }
+
         elements.logoutBtn.addEventListener('click', handleLogout);
         elements.sendForm.addEventListener('submit', handleSendMessage);
         elements.tabBtns.forEach(btn => btn.addEventListener('click', handleTabClick));
@@ -1119,6 +1127,21 @@ function initialize() {
             elements.modalSaveBtn.addEventListener('click', handleSaveProfile);
             elements.avatarEditOverlay.addEventListener('click', () => elements.avatarUpload.click());
             elements.avatarUpload.addEventListener('change', handleAvatarUpload);
+            elements.avatarUpload.addEventListener('change', handleAvatarUpload);
+        }
+
+        // Modal Close Buttons
+        if (elements.closeModal) {
+            elements.closeModal.addEventListener('click', () => {
+                elements.profileModal.classList.remove('show');
+                setTimeout(() => elements.profileModal.classList.add('hidden'), 300);
+            });
+        }
+        if (elements.closeThreadModal) {
+            elements.closeThreadModal.addEventListener('click', () => {
+                elements.threadModal.classList.remove('show');
+                setTimeout(() => elements.threadModal.classList.add('hidden'), 300);
+            });
         }
 
     }
