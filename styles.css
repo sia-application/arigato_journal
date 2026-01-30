@@ -78,7 +78,7 @@
     .user-card-actions {
         width: 100% !important;
         display: flex !important;
-        justify-content: flex-end !important;
+        justify-content: center !important;
         gap: 8px !important;
         margin-top: 8px !important;
         padding-top: 8px !important;
