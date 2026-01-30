@@ -497,13 +497,41 @@ function escapeHtml(text) {
 }
 
 // Notification Helpers
-function checkNotificationPermission() {
+async function checkNotificationPermission() {
     if (!('Notification' in window) || !elements.notificationBanner) return;
 
     if (Notification.permission === 'default') {
         elements.notificationBanner.classList.remove('hidden');
     } else {
         elements.notificationBanner.classList.add('hidden');
+        if (Notification.permission === 'granted') {
+            // Ensure token is fresh even if permission was granted previously
+            saveFcmToken();
+        }
+    }
+}
+
+// Separate function to save token
+async function saveFcmToken() {
+    // VAPID Key: Replace with your actual key from Firebase Console
+    const vapidKey = 'BDGbx329T5nJgatWeRlp3ejTvRkY6OBOjiZTVhcYW8ub2HW3xvs6yaFSRzc5zXY2vME2XGZJqpKz5e92Rlf1rFg';
+
+    try {
+        const token = await getToken(messaging, { vapidKey: vapidKey });
+        if (token) {
+            console.log('FCM Token:', token);
+            // Save to Firestore
+            const currentUser = getCurrentUser();
+            if (currentUser) {
+                const userRef = doc(db, "users", currentUser.userId);
+                await updateDoc(userRef, { fcmToken: token });
+                console.log('FCM Token saved to Firestore');
+            }
+        } else {
+            console.log('No registration token available.');
+        }
+    } catch (tokenErr) {
+        console.log('Error retrieving/saving token: ', tokenErr);
     }
 }
 
@@ -514,28 +542,8 @@ async function requestNotificationPermission() {
             console.log('Notification permission granted.');
             elements.notificationBanner.classList.add('hidden');
 
-            // Get FCM Token
-            // Get FCM Token
-            // VAPID Key: Replace with your actual key from Firebase Console
-            const vapidKey = 'BDGbx329T5nJgatWeRlp3ejTvRkY6OBOjiZTVhcYW8ub2HW3xvs6yaFSRzc5zXY2vME2XGZJqpKz5e92Rlf1rFg';
-
-            try {
-                const token = await getToken(messaging, { vapidKey: vapidKey });
-                if (token) {
-                    console.log('FCM Token:', token);
-                    // Save to Firestore
-                    const currentUser = getCurrentUser();
-                    if (currentUser) {
-                        const userRef = doc(db, "users", currentUser.userId);
-                        await updateDoc(userRef, { fcmToken: token });
-                    }
-                } else {
-                    console.log('No registration token available. Request permission to generate one.');
-                }
-            } catch (tokenErr) {
-                console.log('Error retrieving token: ', tokenErr);
-                // Proceed without token if VAPID key is missing/invalid, just hide banner
-            }
+            // Get FCM Token using helper
+            await saveFcmToken();
 
             // Test notification
             triggerNotification("Arigato Journal", "通知設定が完了しました！");
