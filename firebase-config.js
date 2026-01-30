@@ -21,7 +21,12 @@ const db = initializeFirestore(app, {
         tabManager: persistentMultipleTabManager()
     })
 });
-const messaging = getMessaging(app);
+let messaging = null;
+try {
+    messaging = getMessaging(app);
+} catch (err) {
+    console.warn("Failed to initialize Firebase Messaging (likely insecure context):", err);
+}
 
 // Remove old deprecated call
 // enableIndexedDbPersistence(db)...
