@@ -655,7 +655,7 @@ window.toggleBlock = async (targetUserId) => {
         showToast('ブロックを解除しました');
         isBlocked = false;
     } else {
-        // Block and also Unfollow if following
+        // Block and also Unfollow if following (Me -> Them)
         const updates = {
             blocked: arrayUnion(targetUserId)
         };
@@ -665,6 +665,18 @@ window.toggleBlock = async (targetUserId) => {
         }
 
         await updateDoc(userRef, updates);
+
+        // Also remove ME from THEIR following list (Them -> Me) [Mutual Unfollow]
+        try {
+            const targetRef = doc(db, "users", targetUserId);
+            // We assume target user doc exists
+            await updateDoc(targetRef, {
+                following: arrayRemove(currentUser.userId)
+            });
+        } catch (e) {
+            console.error("Error removing follower on block:", e);
+        }
+
         showToast('ブロックしました');
         isBlocked = true;
     }
@@ -675,23 +687,23 @@ window.toggleBlock = async (targetUserId) => {
     // 1. Update Profile Modal if Open
     if (elements.profileModal.classList.contains('show') && currentProfileUserId === targetUserId) {
         elements.modalBlockBtn.textContent = isBlocked ? 'ブロック中' : 'ブロック';
-        elements.modalBlockBtn.className = isBlocked ? 'btn btn-blocking' : 'btn btn-danger';
+        elements.modalBlockBtn.className = isBlocked ? 'btn btn-blocking profile-action-btn' : 'btn btn-danger profile-action-btn';
 
         // Disable Follow button if blocked
         elements.modalActionBtn.disabled = isBlocked;
-        elements.modalActionBtn.style.opacity = isBlocked ? '0.5' : '1';
+        elements.modalActionBtn.style.opacity = isBlocked ? '1' : '1';
 
         const isFollowing = currentUser.following && currentUser.following.includes(targetUserId);
         if (isBlocked) {
             elements.modalActionBtn.textContent = 'フォロー不可';
-            elements.modalActionBtn.className = 'btn btn-disabled-white';
+            elements.modalActionBtn.className = 'btn btn-disabled-white profile-action-btn';
         } else {
             elements.modalActionBtn.textContent = isFollowing ? 'フォロー中' : 'フォローする';
-            elements.modalActionBtn.className = 'btn btn-primary';
+            elements.modalActionBtn.className = 'btn btn-primary profile-action-btn';
         }
 
         elements.modalThanksBtn.disabled = !isFollowing;
-        elements.modalThanksBtn.className = isFollowing ? 'btn btn-success' : 'btn btn-disabled-white';
+        elements.modalThanksBtn.className = isFollowing ? 'btn btn-success profile-action-btn' : 'btn btn-disabled-white profile-action-btn';
         elements.modalThanksBtn.style.opacity = '1';
     }
 
