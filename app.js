@@ -468,10 +468,9 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
         <div class="${cardClass}" id="msg-${msg.id}">
             <div class="message-header">
                 ${userDisplay}
-            </div>
-            
-            <div class="message-meta" style="font-size: 0.8em; color: var(--text-secondary); margin-bottom: 8px;">
-                ${timeLabel}${formatDate(timeToUse)}
+                <div class="message-meta" style="font-size: 0.8em; color: var(--text-secondary);">
+                    ${timeLabel}${formatDate(timeToUse)}
+                </div>
             </div>
 
             <div class="message-body">
@@ -768,15 +767,15 @@ function renderReceivedMessages() {
                 <span class="message-from" style="font-weight:bold; font-size:1.1em; cursor:pointer;" onclick="event.stopPropagation(); window.showUserProfile('${sender.id}')">
                     ${escapeHtml(sender.name)}
                 </span>
-                ${sender.unread > 0 ? '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.8em;">New</span>' : ''}
+                <div style="display:flex; align-items:center; gap:8px;">
+                     ${sender.unread > 0 ? '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.8em;">New</span>' : ''}
+                     <span style="font-size:0.8em; color:var(--text-light);">${formatDate(sender.lastMessage.createdAt)}</span>
+                </div>
             </div>
              <div class="message-body" style="margin-top:8px;">
                 <div class="message-text" style="color:var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                     ${escapeHtml(sender.lastMessage.message)}
                 </div>
-            </div>
-            <div class="message-footer" style="text-align:right; font-size:0.8em; color:var(--text-light); margin-top:4px;">
-                ${formatDate(sender.lastMessage.createdAt)}
             </div>
         `;
         listContainer.appendChild(div);
@@ -859,14 +858,12 @@ function renderSentMessages() {
                 <span class="message-to" style="font-weight:bold; font-size:1.1em; cursor:pointer;" onclick="event.stopPropagation(); window.showUserProfile('${pf.id}')">
                     ${escapeHtml(pf.name)}
                 </span>
+                 <span style="font-size:0.8em; color:var(--text-light);">${formatDate(pf.lastMessage.createdAt)}</span>
             </div>
              <div class="message-body" style="margin-top:8px;">
                 <div class="message-text" style="color:var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                     ${escapeHtml(pf.lastMessage.message)}
                 </div>
-            </div>
-             <div class="message-footer" style="text-align:right; font-size:0.8em; color:var(--text-light); margin-top:4px;">
-                ${formatDate(pf.lastMessage.createdAt)}
             </div>
         `;
         listContainer.appendChild(div);
