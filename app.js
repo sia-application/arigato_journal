@@ -526,12 +526,14 @@ async function saveFcmToken() {
                 const userRef = doc(db, "users", currentUser.userId);
                 await updateDoc(userRef, { fcmToken: token });
                 console.log('FCM Token saved to Firestore');
+                showToast("通知設定をサーバーに保存しました ✅");
             }
         } else {
             console.log('No registration token available.');
         }
     } catch (tokenErr) {
         console.log('Error retrieving/saving token: ', tokenErr);
+        showToast("通知設定の保存に失敗しました ❌");
     }
 }
 

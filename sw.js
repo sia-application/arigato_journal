@@ -25,7 +25,7 @@ onBackgroundMessage(messaging, (payload) => {
     self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-const CACHE_NAME = 'arigato-journal-v4';
+const CACHE_NAME = 'arigato-journal-v5';
 const ASSETS = [
     './',
     './index.html',
