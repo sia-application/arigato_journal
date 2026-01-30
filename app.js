@@ -541,11 +541,11 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
             </div>
         `;
     } else if (type === 'received') {
-        const showDot = (msg.isRead === false && msg.toId === currentUser.userId) || hasUnreadReplies;
+        const showDot = isSessionNew;
         userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>${showDot ? '<span class="unread-dot"></span>' : ''}${threadBtnWithBadge}${deleteBtn}</div>`;
     } else if (type === 'sent') {
-        const showDot = (msg.isRead === false && msg.toId === currentUser.userId) || hasUnreadReplies;
-        userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span>${showDot ? '<span class="unread-dot"></span>' : ''}${threadBtnWithBadge}${deleteBtn}</div>`;
+        // Dot is removed in Sent Detail view as per user request
+        userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span>${threadBtnWithBadge}${deleteBtn}</div>`;
     }
     else if (type === 'thread') {
         userDisplay = `
@@ -1020,20 +1020,28 @@ function renderReceivedMessages() {
             );
             const absoluteLatest = allPartnerMessages.reduce((max, m) => Math.max(max, m.createdAt), 0);
 
+            // Count unread messages belonging to Received History for this partner
+            const unreadCount = allPartnerMessages.filter(m => {
+                const isNew = !m.isRead || sessionUnreadMessages.has(m.id);
+                if (m.toId !== currentUser.userId || !isNew) return false;
+                if (!m.rootId) return true; // Root is Received (toId is Me)
+                const root = cachedMessages.find(r => r.id === m.rootId);
+                return root && root.toId === currentUser.userId; // Started by others
+            }).length;
+
             senders[msg.fromId] = {
                 id: msg.fromId,
                 name: msg.fromName,
                 lastMessage: msg,
                 absoluteLatest: absoluteLatest,
                 count: 0,
-                unread: 0
+                unread: unreadCount
             };
         }
         if (msg.createdAt > senders[msg.fromId].lastMessage.createdAt) {
             senders[msg.fromId].lastMessage = msg;
         }
         senders[msg.fromId].count++;
-        if (!msg.isRead) senders[msg.fromId].unread++;
     });
 
     const listContainer = elements.receivedSendersList;
@@ -1077,17 +1085,19 @@ function renderReceivedMessages() {
     });
 }
 
-window.showReceivedDetail = (senderId) => {
+window.showReceivedDetail = (senderId, options = {}) => {
     currentReceivedPartnerId = senderId;
     const currentUser = getCurrentUser();
 
     // 1. Snapshot unread status before marking as read to show "New" badge in this session
-    const currentUserMessages = cachedMessages.filter(m => m.toId === currentUser.userId && m.fromId === senderId && !m.isRead);
-    currentUserMessages.forEach(m => {
-        sessionUnreadMessages.add(m.id);
-        if (m.rootId) sessionUnreadThreadButtons.add(m.rootId);
-        else sessionUnreadThreadButtons.add(m.id);
-    });
+    if (!options.skipSnapshot) {
+        const currentUserMessages = cachedMessages.filter(m => m.toId === currentUser.userId && m.fromId === senderId && !m.isRead);
+        currentUserMessages.forEach(m => {
+            sessionUnreadMessages.add(m.id);
+            if (m.rootId) sessionUnreadThreadButtons.add(m.rootId);
+            else sessionUnreadThreadButtons.add(m.id);
+        });
+    }
 
     // Mark as read (Only received messages/replies)
     markMessagesAsRead(currentUser.userId, senderId, { type: 'received' });
@@ -1148,8 +1158,14 @@ function renderSentMessages() {
             );
             const absoluteLatest = allPartnerMessages.reduce((max, m) => Math.max(max, m.createdAt), 0);
 
-            // Count unread replies (messages sent TO me from this partner)
-            const unreadCount = allPartnerMessages.filter(m => m.toId === currentUser.userId && !m.isRead).length;
+            // Count unread replies belonging to Sent History for this partner
+            const unreadCount = allPartnerMessages.filter(m => {
+                const isNew = !m.isRead || sessionUnreadMessages.has(m.id);
+                if (m.toId !== currentUser.userId || !isNew) return false;
+                if (!m.rootId) return false; // Root started by me is NOT Received
+                const root = cachedMessages.find(r => r.id === m.rootId);
+                return root && root.fromId === currentUser.userId; // Started by me
+            }).length;
 
             recipients[msg.toId] = {
                 id: msg.toId,
@@ -1203,16 +1219,18 @@ function renderSentMessages() {
     });
 }
 
-window.showSentDetail = (recipientId) => {
+window.showSentDetail = (recipientId, options = {}) => {
     currentSentPartnerId = recipientId;
     const currentUser = getCurrentUser();
 
     // 1. Snapshot unread replies (messages sent TO me from this partner in my sent threads)
-    const currentUserReplies = cachedMessages.filter(m => m.toId === currentUser.userId && m.fromId === recipientId && !m.isRead);
-    currentUserReplies.forEach(m => {
-        sessionUnreadMessages.add(m.id);
-        if (m.rootId) sessionUnreadThreadButtons.add(m.rootId);
-    });
+    if (!options.skipSnapshot) {
+        const currentUserReplies = cachedMessages.filter(m => m.toId === currentUser.userId && m.fromId === recipientId && !m.isRead);
+        currentUserReplies.forEach(m => {
+            sessionUnreadMessages.add(m.id);
+            if (m.rootId) sessionUnreadThreadButtons.add(m.rootId);
+        });
+    }
 
     // Mark as read (Only unread replies in my sent threads)
     markMessagesAsRead(currentUser.userId, recipientId, { type: 'sent' });
@@ -1564,6 +1582,15 @@ function initialize() {
         }
         if (elements.closeThreadModal) {
             elements.closeThreadModal.addEventListener('click', () => {
+                // Return thread button color to normal on close
+                if (currentThreadContext) {
+                    sessionUnreadThreadButtons.delete(currentThreadContext.rootId);
+                    // Re-render current detail view to reflect color change
+                    // skipSnapshot prevents re-adding unread state from stale cachedMessages
+                    if (currentReceivedPartnerId) window.showReceivedDetail(currentReceivedPartnerId, { skipSnapshot: true });
+                    else if (currentSentPartnerId) window.showSentDetail(currentSentPartnerId, { skipSnapshot: true });
+                    else if (document.querySelector('.tab-btn.active')?.dataset.tab === 'timeline') renderTimeline();
+                }
                 elements.threadModal.classList.remove('show');
                 setTimeout(() => elements.threadModal.classList.add('hidden'), 300);
             });
