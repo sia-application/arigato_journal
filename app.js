@@ -425,6 +425,12 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
         cardClass += ' unread';
     }
 
+    // Thread Button
+    const threadBtn = `<button class="reply-btn" onclick="window.openThread('${msg.id}')">💬 スレッド</button>`;
+
+    // Delete Button (only own)
+    const deleteBtn = isOwn ? `<button class="delete-btn" onclick="window.deleteMessage('${msg.id}')">🗑️</button>` : '';
+
     // User Display
     let userDisplay = '';
     const nameStyle = 'cursor:pointer; text-decoration:underline;';
@@ -435,16 +441,20 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
                 <span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>
                 <span class="message-arrow">→</span>
                 <span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span>
+                ${threadBtn}
+                ${deleteBtn}
             </div>
         `;
     } else if (type === 'received') {
-        userDisplay = `<div class="message-users"><span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span></div>`;
+        userDisplay = `<div class="message-users"><span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>${threadBtn}${deleteBtn}</div>`;
     } else if (type === 'sent') {
-        userDisplay = `<div class="message-users"><span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span></div>`;
+        userDisplay = `<div class="message-users"><span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span>${threadBtn}${deleteBtn}</div>`;
     } else if (type === 'thread') {
         userDisplay = `
             <div class="message-users">
                 <span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>
+                ${threadBtn}
+                ${deleteBtn}
             </div>
         `;
     }
@@ -454,20 +464,10 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
     const timeLabel = latestTime ? '最新: ' : '';
     let extraBadges = '';
 
-    // Thread Button
-    const threadBtn = `<button class="reply-btn" onclick="window.openThread('${msg.id}')">💬 スレッド</button>`;
-
-    // Delete Button (only own)
-    const deleteBtn = isOwn ? `<button class="delete-btn" onclick="window.deleteMessage('${msg.id}')">🗑️</button>` : '';
-
     return `
         <div class="${cardClass}" id="msg-${msg.id}">
             <div class="message-header">
                 ${userDisplay}
-                <div class="message-actions-sent" style="display:flex; gap:8px;">
-                    ${threadBtn}
-                    ${deleteBtn}
-                </div>
             </div>
             
             <div class="message-meta" style="font-size: 0.8em; color: var(--text-secondary); margin-bottom: 8px;">
