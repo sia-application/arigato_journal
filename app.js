@@ -318,6 +318,11 @@ function initializeElements() {
         elements.modalEditBtn = document.getElementById('modal-edit-btn');
         elements.modalSaveBtn = document.getElementById('modal-save-btn');
         elements.modalCancelBtn = document.getElementById('modal-cancel-btn');
+
+        // Notification Banner
+        elements.notificationBanner = document.getElementById('notification-banner');
+        elements.enableNotificationsBtn = document.getElementById('enable-notifications-btn');
+        elements.closeNotificationBanner = document.getElementById('close-notification-banner');
         elements.modalThanksBtn = document.getElementById('modal-thanks-btn');
 
         elements.threadModal = document.getElementById('thread-modal');
@@ -474,10 +479,29 @@ function escapeHtml(text) {
 }
 
 // Notification Helpers
+function checkNotificationPermission() {
+    if (!('Notification' in window) || !elements.notificationBanner) return;
+
+    if (Notification.permission === 'default') {
+        elements.notificationBanner.classList.remove('hidden');
+    } else {
+        elements.notificationBanner.classList.add('hidden');
+    }
+}
+
 async function requestNotificationPermission() {
     if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-        await Notification.requestPermission();
+
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+        showToast("通知が有効になりました");
+        if (elements.notificationBanner) elements.notificationBanner.classList.add('hidden');
+
+        // Test notification
+        triggerNotification("Arigato Journal", "通知設定が完了しました！");
+    } else if (permission === 'denied') {
+        showToast("通知が拒否されました。ブラウザの設定から変更できます。");
+        if (elements.notificationBanner) elements.notificationBanner.classList.add('hidden');
     }
 }
 
@@ -1584,8 +1608,17 @@ function initialize() {
         // Setup Listeners
         setupListeners();
 
-        // Request Notification Permission
-        requestNotificationPermission();
+        // Check Notification Permission (Show banner if default)
+        checkNotificationPermission();
+
+        if (elements.enableNotificationsBtn) {
+            elements.enableNotificationsBtn.addEventListener('click', requestNotificationPermission);
+        }
+        if (elements.closeNotificationBanner) {
+            elements.closeNotificationBanner.addEventListener('click', () => {
+                elements.notificationBanner.classList.add('hidden');
+            });
+        }
 
         // Initial Tab
         switchTab('timeline');

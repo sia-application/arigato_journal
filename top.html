@@ -39,6 +39,16 @@
 
         <!-- メインコンテンツ -->
         <main class="main-content">
+            <!-- 通知許可バナー -->
+            <div id="notification-banner" class="notification-banner hidden">
+                <div class="banner-content">
+                    <span class="banner-icon">🔔</span>
+                    <p>新しいメッセージの通知を受け取りますか？</p>
+                    <button id="enable-notifications-btn" class="btn btn-sm btn-primary">有効にする</button>
+                    <button id="close-notification-banner" class="btn-close">×</button>
+                </div>
+            </div>
+
             <!-- タブナビゲーション -->
             <nav class="tab-nav">
                 <button class="tab-btn active" data-tab="timeline">
