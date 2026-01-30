@@ -431,14 +431,12 @@ function setupListeners() {
     });
 
     // Handle Foreground Messages
-    if (messaging) {
-        onMessage(messaging, (payload) => {
-            console.log('Message received. ', payload);
-            const { title, body } = payload.notification;
-            // Show Toast
-            showToast(`🔔 ${title}: ${body}`);
-        });
-    }
+    onMessage(messaging, (payload) => {
+        console.log('Message received. ', payload);
+        const { title, body } = payload.notification;
+        // Show Toast
+        showToast(`🔔 ${title}: ${body}`);
+    });
 }
 
 
@@ -517,29 +515,26 @@ async function requestNotificationPermission() {
             elements.notificationBanner.classList.add('hidden');
 
             // Get FCM Token
+            // Get FCM Token
             // VAPID Key: Replace with your actual key from Firebase Console
             const vapidKey = 'BDGbx329T5nJgatWeRlp3ejTvRkY6OBOjiZTVhcYW8ub2HW3xvs6yaFSRzc5zXY2vME2XGZJqpKz5e92Rlf1rFg';
 
-            if (messaging) {
-                try {
-                    const token = await getToken(messaging, { vapidKey: vapidKey });
-                    if (token) {
-                        console.log('FCM Token:', token);
-                        // Save to Firestore
-                        const currentUser = getCurrentUser();
-                        if (currentUser) {
-                            const userRef = doc(db, "users", currentUser.userId);
-                            await updateDoc(userRef, { fcmToken: token });
-                        }
-                    } else {
-                        console.log('No registration token available. Request permission to generate one.');
+            try {
+                const token = await getToken(messaging, { vapidKey: vapidKey });
+                if (token) {
+                    console.log('FCM Token:', token);
+                    // Save to Firestore
+                    const currentUser = getCurrentUser();
+                    if (currentUser) {
+                        const userRef = doc(db, "users", currentUser.userId);
+                        await updateDoc(userRef, { fcmToken: token });
                     }
-                } catch (tokenErr) {
-                    console.log('Error retrieving token: ', tokenErr);
-                    // Proceed without token if VAPID key is missing/invalid, just hide banner
+                } else {
+                    console.log('No registration token available. Request permission to generate one.');
                 }
-            } else {
-                console.warn("Messaging not supported/initialized.");
+            } catch (tokenErr) {
+                console.log('Error retrieving token: ', tokenErr);
+                // Proceed without token if VAPID key is missing/invalid, just hide banner
             }
 
             // Test notification
