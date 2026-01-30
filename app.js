@@ -1043,18 +1043,7 @@ window.showReceivedDetail = (senderId) => {
     // Mark as read
     markMessagesAsRead(currentUser.userId, senderId);
 
-    // Show ONLY messages I received from this sender (Root messages only)
-    const messages = cachedMessages.filter(m =>
-        m.toId === currentUser.userId && m.fromId === senderId && !m.rootId
-    ).sort((a, b) => b.createdAt - a.createdAt);
-
-    if (messages.length === 0) {
-        // Automatically back to list if no messages left
-        backToReceivedList();
-        return;
-    }
-
-    // Calculate Latest Dates including replies across all cached messages
+    // 1. Calculate Latest Dates including replies across all cached messages first
     const threadLatest = {};
     cachedMessages.forEach(m => {
         const rootId = m.rootId || m.id;
@@ -1063,12 +1052,23 @@ window.showReceivedDetail = (senderId) => {
         }
     });
 
+    // 2. Filter and Sort by latest thread activity
+    const messages = cachedMessages.filter(m =>
+        m.toId === currentUser.userId && m.fromId === senderId && !m.rootId
+    ).sort((a, b) => (threadLatest[b.id] || b.createdAt) - (threadLatest[a.id] || a.createdAt));
+
+    if (messages.length === 0) {
+        // Automatically back to list if no messages left
+        backToReceivedList();
+        return;
+    }
+
     elements.receivedSendersList.classList.add('hidden');
     elements.receivedMessagesDetail.classList.remove('hidden');
     elements.detailSenderName.textContent = messages[0].fromName; // Use latest name
 
     elements.detailMessagesList.innerHTML = messages.map(msg => {
-        const latestAt = threadLatest[msg.rootId || msg.id] || msg.createdAt;
+        const latestAt = threadLatest[msg.id] || msg.createdAt;
         return createMessageCard(msg, 'received', latestAt);
     }).join('');
 }
@@ -1154,10 +1154,19 @@ window.showSentDetail = (recipientId) => {
     // Mark as read (Unread replies in this thread)
     markMessagesAsRead(currentUser.userId, recipientId);
 
-    // Show ONLY messages I sent to this recipient (Root messages only)
+    // 1. Calculate Latest Dates including replies first
+    const threadLatest = {};
+    cachedMessages.forEach(m => {
+        const rootId = m.rootId || m.id;
+        if (!threadLatest[rootId] || m.createdAt > threadLatest[rootId]) {
+            threadLatest[rootId] = m.createdAt;
+        }
+    });
+
+    // 2. Filter and Sort by latest thread activity
     const messages = cachedMessages.filter(m =>
         m.fromId === currentUser.userId && m.toId === recipientId && !m.rootId
-    ).sort((a, b) => b.createdAt - a.createdAt);
+    ).sort((a, b) => (threadLatest[b.id] || b.createdAt) - (threadLatest[a.id] || a.createdAt));
 
     if (messages.length === 0) {
         // Automatically back to list if no messages left
@@ -1169,17 +1178,8 @@ window.showSentDetail = (recipientId) => {
     elements.sentMessagesDetail.classList.remove('hidden');
     elements.detailRecipientName.textContent = messages[0].toName;
 
-    // Calculate Latest Dates including replies
-    const threadLatest = {};
-    cachedMessages.forEach(m => {
-        const rootId = m.rootId || m.id;
-        if (!threadLatest[rootId] || m.createdAt > threadLatest[rootId]) {
-            threadLatest[rootId] = m.createdAt;
-        }
-    });
-
     elements.detailSentMessagesList.innerHTML = messages.map(msg => {
-        const latestAt = threadLatest[msg.rootId || msg.id] || msg.createdAt;
+        const latestAt = threadLatest[msg.id] || msg.createdAt;
         return createMessageCard(msg, 'sent', latestAt);
     }).join('');
 };
