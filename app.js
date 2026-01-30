@@ -188,6 +188,7 @@ async function markMessagesAsRead(userId, partnerId, isSentHistory) {
 // Local State caches for rendering
 let cachedMessages = [];
 let cachedUsers = [];
+let currentReplyContext = null;
 
 // Listeners
 let unsubscribeMessages = null;
@@ -279,10 +280,12 @@ function initializeElements() {
         elements.modalThanksBtn = document.getElementById('modal-thanks-btn');
 
         elements.threadModal = document.getElementById('thread-modal');
-        elements.closeThreadModal = document.querySelector('.close-thread-modal');
+        elements.closeThreadModal = elements.threadModal.querySelector('.close-modal');
         elements.threadMessagesList = document.getElementById('thread-messages-list');
         elements.threadReplyForm = document.getElementById('thread-reply-form');
         elements.threadInput = document.getElementById('thread-input');
+
+        elements.toast = document.getElementById('toast');
     }
 
     elements.toast = document.getElementById('toast');
@@ -325,6 +328,14 @@ function setupListeners() {
 
         // Refresh my session data in case I was updated (e.g. followed/blocked)
         refreshCurrentUser().then(() => {
+            const currentUser = getCurrentUser();
+            if (currentUser) {
+                // Update Recipient Select unconditionally so it's ready for any Send Thanks action
+                const followingIds = currentUser.following || [];
+                const followingUsers = cachedUsers.filter(u => followingIds.includes(u.userId));
+                updateRecipientSelect(followingUsers);
+            }
+
             const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
             if (activeTab === 'friends') {
                 renderFollowingList();
@@ -403,9 +414,19 @@ function updateSentBadge(count) {
 
 let toastTimeout;
 function showToast(message) {
+    if (!elements.toast) {
+        // Fallback if toast element missing (e.g. partial semantic change or race condition)
+        console.warn("Toast element missing, using alert:", message);
+        // Only alert for errors/validation to avoid spam, but here we want feedback
+        if (message.includes('失敗') || message.includes('選択') || message.includes('入力')) {
+            alert(message);
+        }
+        return;
+    }
     if (toastTimeout) clearTimeout(toastTimeout);
     const toastMessage = elements.toast.querySelector('.toast-message');
-    toastMessage.textContent = message;
+    if (toastMessage) toastMessage.textContent = message;
+
     elements.toast.classList.remove('hidden');
     elements.toast.classList.add('show');
     toastTimeout = setTimeout(() => {
@@ -547,6 +568,17 @@ function handleLogout() {
     window.location.href = 'index.html';
 }
 
+// Helper to reset reply state
+function cancelReply() {
+    currentReplyContext = null;
+    const replyPreview = document.querySelector('.reply-preview'); // Assuming a UI element exists or will be added
+    if (replyPreview) {
+        replyPreview.remove();
+        // and/or hide container
+    }
+    // Also clear visual cues in input if any
+}
+
 async function handleSendMessage(e) {
     e.preventDefault();
     const recipientId = elements.recipientSelect.value;
@@ -554,7 +586,14 @@ async function handleSendMessage(e) {
     const recipientName = recipientOption ? recipientOption.dataset.name : '';
     const message = elements.messageInput.value.trim();
 
-    if (!recipientId || !message) return;
+    if (!recipientId) {
+        showToast('送信先を選択してください');
+        return;
+    }
+    if (!message) {
+        showToast('メッセージを入力してください');
+        return;
+    }
 
     const options = {};
     if (currentReplyContext) options.replyTo = currentReplyContext;
@@ -630,7 +669,29 @@ window.toggleFollow = async (targetUserId) => {
         }
     });
 
-    // 3. If in Friends Tab, refresh lists to move/remove users if needed
+    // 3. Always refresh Recipient Select (for Thanks tab) since following changed
+    const followingIds = currentUser.following || [];
+    let followingUsers = cachedUsers.filter(u => followingIds.includes(u.userId));
+
+    // Robustness: If target user isn't in cachedUsers (e.g. fresh search), fetch & add
+    if (followingIds.includes(targetUserId) && !followingUsers.find(u => u.userId === targetUserId)) {
+        try {
+            const missingUser = await findUser(targetUserId);
+            if (missingUser) {
+                followingUsers.push(missingUser);
+                // Also update cache so subsequent renders work
+                if (!cachedUsers.find(u => u.userId === targetUserId)) {
+                    cachedUsers.push(missingUser);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch followed user for list:", e);
+        }
+    }
+
+    updateRecipientSelect(followingUsers);
+
+    // 4. If in Friends Tab, refresh lists to move/remove users if needed
     const activeTab = document.querySelector('.tab-btn.active');
     if (activeTab && activeTab.dataset.tab === 'friends') {
         renderFollowingList();
@@ -683,6 +744,11 @@ window.toggleBlock = async (targetUserId) => {
 
     // Refresh
     currentUser = await refreshCurrentUser();
+
+    // Always refresh Recipient Select since following changed (Unfollow on Block)
+    const followingIds = currentUser.following || [];
+    const followingUsers = cachedUsers.filter(u => followingIds.includes(u.userId));
+    updateRecipientSelect(followingUsers);
 
     // 1. Update Profile Modal if Open
     if (elements.profileModal.classList.contains('show') && currentProfileUserId === targetUserId) {
@@ -1151,6 +1217,8 @@ function renderSearchResult() {
 
 function updateRecipientSelect(friends) {
     if (!elements.recipientSelect) return;
+    const currentVal = elements.recipientSelect.value;
+
     elements.recipientSelect.innerHTML = '<option value="">▼ 送りたい相手を選んでください</option>';
     friends.forEach(user => {
         const option = document.createElement('option');
@@ -1159,6 +1227,11 @@ function updateRecipientSelect(friends) {
         option.dataset.name = user.name;
         elements.recipientSelect.appendChild(option);
     });
+
+    // Restore selection if it still exists
+    if (currentVal && friends.find(u => u.userId === currentVal)) {
+        elements.recipientSelect.value = currentVal;
+    }
 }
 
 function renderProfileModal(user) {
