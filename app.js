@@ -228,6 +228,13 @@ let cachedMessages = [];
 let cachedUsers = [];
 let currentReplyContext = null;
 
+// Pagination Limits
+let timelineLimit = 20;
+let receivedLimit = 20;
+let sentLimit = 20;
+let receivedDetailLimit = 20;
+let sentDetailLimit = 20;
+
 // Listeners
 let unsubscribeMessages = null;
 let unsubscribeUsers = null;
@@ -1130,7 +1137,9 @@ function renderReceivedMessages() {
         return;
     }
 
-    sortedSenders.forEach(sender => {
+    const visibleSenders = sortedSenders.slice(0, receivedLimit);
+
+    visibleSenders.forEach(sender => {
         const div = document.createElement('div');
         div.className = `message-card ${sender.unread > 0 ? 'unread' : ''}`;
         div.style.cursor = 'pointer';
@@ -1156,6 +1165,17 @@ function renderReceivedMessages() {
         `;
         listContainer.appendChild(div);
     });
+
+    if (sortedSenders.length > receivedLimit) {
+        const loadMoreBtn = document.createElement('button');
+        loadMoreBtn.className = 'btn-load-more';
+        loadMoreBtn.textContent = 'もっと見る';
+        loadMoreBtn.onclick = () => {
+            receivedLimit += 20;
+            renderReceivedMessages();
+        };
+        listContainer.appendChild(loadMoreBtn);
+    }
 }
 
 window.showReceivedDetail = (senderId, options = {}) => {
@@ -1195,14 +1215,40 @@ window.showReceivedDetail = (senderId, options = {}) => {
         return;
     }
 
+    // Reset limit if it is a fresh open (not a re-render from listener or load more)
+    // Actually, we should probably reset only if senderId changes, but showReceivedDetail is called by click.
+    // To distinguish "Update" vs "New Open", we check if currentReceivedPartnerId was already this ID.
+    // However, the function sets currentReceivedPartnerId = senderId at the very top.
+    // So we should rely on a passed option or just check if the limit is default?
+    // Better: If we are here from a click on the list, we likely want to reset.
+    // If we are here from "Load More", we shouldn't reset.
+    // But "Load More" calls render... wait, Load More should call showReceivedDetail(id).
+
+    if (!options.keepLimit) {
+        receivedDetailLimit = 20;
+    }
+
     elements.receivedSendersList.classList.add('hidden');
     elements.receivedMessagesDetail.classList.remove('hidden');
     elements.detailSenderName.textContent = messages[0].fromName; // Use latest name
 
-    elements.detailMessagesList.innerHTML = messages.map(msg => {
+    const visibleMessages = messages.slice(0, receivedDetailLimit);
+
+    elements.detailMessagesList.innerHTML = visibleMessages.map(msg => {
         const latestAt = threadLatest[msg.id] || msg.createdAt;
         return createMessageCard(msg, 'received', latestAt);
     }).join('');
+
+    if (messages.length > receivedDetailLimit) {
+        const loadMoreBtn = document.createElement('button');
+        loadMoreBtn.className = 'btn-load-more';
+        loadMoreBtn.textContent = 'もっと見る';
+        loadMoreBtn.onclick = () => {
+            receivedDetailLimit += 20;
+            showReceivedDetail(senderId, { skipSnapshot: true, keepLimit: true });
+        };
+        elements.detailMessagesList.appendChild(loadMoreBtn);
+    }
 }
 
 window.backToReceivedList = () => {
@@ -1267,7 +1313,9 @@ function renderSentMessages() {
         return;
     }
 
-    sortedRecipients.forEach(pf => {
+    const visibleRecipients = sortedRecipients.slice(0, sentLimit);
+
+    visibleRecipients.forEach(pf => {
         const div = document.createElement('div');
         div.className = 'message-card own-message';
         div.style.cursor = 'pointer';
@@ -1290,6 +1338,17 @@ function renderSentMessages() {
         `;
         listContainer.appendChild(div);
     });
+
+    if (sortedRecipients.length > sentLimit) {
+        const loadMoreBtn = document.createElement('button');
+        loadMoreBtn.className = 'btn-load-more';
+        loadMoreBtn.textContent = 'もっと見る';
+        loadMoreBtn.onclick = () => {
+            sentLimit += 20;
+            renderSentMessages();
+        };
+        listContainer.appendChild(loadMoreBtn);
+    }
 }
 
 window.showSentDetail = (recipientId, options = {}) => {
@@ -1328,14 +1387,31 @@ window.showSentDetail = (recipientId, options = {}) => {
         return;
     }
 
+    if (!options.keepLimit) {
+        sentDetailLimit = 20;
+    }
+
     elements.sentRecipientsList.classList.add('hidden');
     elements.sentMessagesDetail.classList.remove('hidden');
     elements.detailRecipientName.textContent = messages[0].toName;
 
-    elements.detailSentMessagesList.innerHTML = messages.map(msg => {
+    const visibleMessages = messages.slice(0, sentDetailLimit);
+
+    elements.detailSentMessagesList.innerHTML = visibleMessages.map(msg => {
         const latestAt = threadLatest[msg.id] || msg.createdAt;
         return createMessageCard(msg, 'sent', latestAt);
     }).join('');
+
+    if (messages.length > sentDetailLimit) {
+        const loadMoreBtn = document.createElement('button');
+        loadMoreBtn.className = 'btn-load-more';
+        loadMoreBtn.textContent = 'もっと見る';
+        loadMoreBtn.onclick = () => {
+            sentDetailLimit += 20;
+            showSentDetail(recipientId, { skipSnapshot: true, keepLimit: true });
+        };
+        elements.detailSentMessagesList.appendChild(loadMoreBtn);
+    }
 };
 
 window.backToSentList = () => {
@@ -1568,12 +1644,25 @@ function renderTimeline() {
         });
 
         // 4. Render
-        const html = sortedMessages.map(msg => {
+        const visibleMessages = sortedMessages.slice(0, timelineLimit);
+
+        const html = visibleMessages.map(msg => {
             const latestAt = threadLatest[msg.id] || msg.createdAt;
             return createMessageCard(msg, 'timeline', latestAt);
         }).join('');
 
         elements.timelineList.innerHTML = html;
+
+        if (sortedMessages.length > timelineLimit) {
+            const loadMoreBtn = document.createElement('button');
+            loadMoreBtn.className = 'btn-load-more';
+            loadMoreBtn.textContent = 'もっと見る';
+            loadMoreBtn.onclick = () => {
+                timelineLimit += 20;
+                renderTimeline();
+            };
+            elements.timelineList.appendChild(loadMoreBtn);
+        }
     }
 }
 

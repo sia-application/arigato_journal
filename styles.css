@@ -1934,3 +1934,41 @@ body::after {
         font-size: 16px !important;
     }
 }
+
+/* ============================
+   ページネーションボタン
+   ============================ */
+.btn-load-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px;
+    background: white;
+    border: 2px solid var(--pink-300);
+    border-radius: var(--radius-lg);
+    color: var(--pink-500);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-normal);
+}
+
+.btn-load-more:hover {
+    background: var(--pink-100);
+    color: var(--pink-500);
+    border-color: var(--pink-300);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.btn-load-more::before {
+    content: '⬇';
+    margin-right: 8px;
+    font-size: 12px;
+}
+
+.btn-load-more:hover::before {
+    color: var(--pink-500);
+}
