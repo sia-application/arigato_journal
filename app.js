@@ -960,9 +960,11 @@ function renderUserCard(user, type = 'following') {
             ありがとうを送る
         </button>`;
 
-        if (isBlocked || blocksYou) {
-            // Blocked State (Priority over Search/Friends logic)
-            // Use btn-blocking for both cases as requested
+        if (blocksYou) {
+            // Blocked by them (Can't interact)
+            actionBtn = `<button class="btn btn-sm btn-disabled-white" style="cursor:not-allowed;" disabled>フォロー不可</button>`;
+        } else if (isBlocked) {
+            // Blocked by me (Can unblock)
             actionBtn = `<button class="btn btn-sm btn-blocking" onclick="window.toggleBlock('${user.userId}')">ブロック中</button>`;
         } else {
             // Not Blocked
