@@ -1581,6 +1581,13 @@ function renderTimeline() {
 function initialize() {
     initializeElements();
 
+    // Register Service Worker for Notifications/PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('Service Worker registered', reg))
+            .catch(err => console.log('Service Worker registration failed', err));
+    }
+
     if (document.getElementById('login-screen') || document.getElementById('register-screen')) {
         if (elements.loginForm) elements.loginForm.addEventListener('submit', handleLogin);
         if (elements.registerForm) elements.registerForm.addEventListener('submit', handleRegister);
