@@ -1763,6 +1763,13 @@ function initialize() {
     }
 
     if (document.getElementById('login-screen') || document.getElementById('register-screen')) {
+        // PWA Session Fix: storage persists, so check if already logged in
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+            window.location.href = 'top.html';
+            return;
+        }
+
         if (elements.loginForm) elements.loginForm.addEventListener('submit', handleLogin);
         if (elements.registerForm) elements.registerForm.addEventListener('submit', handleRegister);
     }
