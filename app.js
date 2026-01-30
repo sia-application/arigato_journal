@@ -334,14 +334,32 @@ function initializeElements() {
 
 
 // Setup Realtime Listeners
+let isInitialMessagesLoad = true;
 function setupListeners() {
     // Listen for Messages
     const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
     unsubscribeMessages = onSnapshot(q, (snapshot) => {
+        const currentUser = getCurrentUser();
+        const prevMessages = cachedMessages;
         cachedMessages = [];
         snapshot.forEach((doc) => {
             cachedMessages.push({ id: doc.id, ...doc.data() });
         });
+
+        // Notification Logic
+        if (!isInitialMessagesLoad && currentUser) {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    const msg = change.doc.data();
+                    // Only notify for messages sent TO me and not from me
+                    if (msg.toId === currentUser.userId && msg.fromId !== currentUser.userId) {
+                        const fromName = cachedUsers.find(u => u.userId === msg.fromId)?.name || "だれか";
+                        triggerNotification("ありがとうが届きました！", `${fromName}さんからメッセージが届いています。`);
+                    }
+                }
+            });
+        }
+        isInitialMessagesLoad = false;
 
         // Re-render current views
         const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
@@ -453,6 +471,33 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Notification Helpers
+async function requestNotificationPermission() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+        await Notification.requestPermission();
+    }
+}
+
+async function triggerNotification(title, body) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    // Standard showNotification from SW is best for iOS/PWA
+    if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        registration.showNotification(title, {
+            body: body,
+            icon: 'assets/logo.png', // Ensure this exists or use fallback
+            badge: 'assets/logo.png',
+            vibrate: [100, 50, 100],
+            data: { url: window.location.href }
+        });
+    } else {
+        // Fallback for non-SW environments
+        new Notification(title, { body });
+    }
 }
 
 function formatDate(dateInput) {
@@ -1538,6 +1583,9 @@ function initialize() {
 
         // Setup Listeners
         setupListeners();
+
+        // Request Notification Permission
+        requestNotificationPermission();
 
         // Initial Tab
         switchTab('timeline');

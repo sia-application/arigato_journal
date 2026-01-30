@@ -41,3 +41,10 @@ self.addEventListener('fetch', (event) => {
             })
     );
 });
+// Notification click event: Open the app
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    event.waitUntil(
+        clients.openWindow('./')
+    );
+});
