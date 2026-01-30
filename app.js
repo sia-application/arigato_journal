@@ -1764,6 +1764,7 @@ function renderTimeline() {
 // Initialization Logic
 function initialize() {
     initializeElements();
+    setupPullToRefresh();
 
     // Register Service Worker for Notifications/PWA
     if ('serviceWorker' in navigator) {
@@ -2089,5 +2090,71 @@ async function handleThreadReply(e) {
 
 
 // Start
+// Start
 document.addEventListener('DOMContentLoaded', initialize);
+
+// Pull to Refresh Logic
+function setupPullToRefresh() {
+    const ptr = document.getElementById('pull-to-refresh');
+    if (!ptr) return;
+
+    let startY = 0;
+    let currentY = 0;
+    let isPulling = false;
+    const threshold = 100; // Drag distance required
+
+    document.body.addEventListener('touchstart', (e) => {
+        if (window.scrollY === 0) {
+            startY = e.touches[0].clientY;
+            isPulling = false;
+        }
+    }, { passive: true });
+
+    document.body.addEventListener('touchmove', (e) => {
+        if (window.scrollY === 0) {
+            currentY = e.touches[0].clientY;
+            const diff = currentY - startY;
+
+            if (diff > 0) {
+                isPulling = true;
+                // Resistance effect
+                const move = Math.min(diff * 0.4, 80);
+
+                // Show indicator
+                if (move > 10) {
+                    ptr.style.top = `${move - 60}px`; // -60 is hidden height
+                    ptr.querySelector('.pull-icon').style.transform = `rotate(${move * 2}deg)`;
+                }
+
+                // Prevent default pull-to-refresh of browser (if any)
+                if (diff > 10 && e.cancelable) {
+                    e.preventDefault();
+                }
+            }
+        }
+    }, { passive: false });
+
+    document.body.addEventListener('touchend', (e) => {
+        if (!isPulling) return;
+
+        const diff = currentY - startY;
+        if (diff > threshold) {
+            // Trigger Refresh
+            ptr.style.top = '0px'; // Keep visible
+            ptr.classList.add('refreshing');
+            ptr.querySelector('.pull-text').textContent = '更新中...';
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        } else {
+            // Reset
+            ptr.style.top = '-60px';
+            ptr.querySelector('.pull-icon').style.transform = `rotate(0deg)`;
+        }
+        isPulling = false;
+        startY = 0;
+        currentY = 0;
+    });
+}
 
