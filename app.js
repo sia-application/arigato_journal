@@ -138,16 +138,33 @@ async function sendMessage(toId, toName, message, options = {}) {
 
 // Delete Message
 async function deleteMessage(messageId) {
-    if (!confirm('このメッセージを削除してもよろしいですか？')) return;
+    if (!confirm('このメッセージ（スレッド全体）を削除してもよろしいですか？')) return;
 
-    await deleteDoc(doc(db, "messages", messageId));
+    try {
+        // 1. Find the message to check if it's a root message
+        const msgDoc = await getDoc(doc(db, "messages", messageId));
+        if (!msgDoc.exists()) return;
+        const msgData = msgDoc.data();
 
-    // Also delete replies? 
-    // In NoSQL/Firestore, cascading delete is client-side or cloud function.
-    // For simplicity, we just leave orphans or client filters them out.
-    // Client side filter: !m.rootId matches...
+        // 2. If it's a root message (no rootId), delete all replies
+        if (!msgData.rootId) {
+            const q = query(collection(db, "messages"), where("rootId", "==", messageId));
+            const querySnapshot = await getDocs(q);
 
-    showToast('メッセージを削除しました');
+            const deletePromises = [];
+            querySnapshot.forEach((document) => {
+                deletePromises.push(deleteDoc(doc(db, "messages", document.id)));
+            });
+            await Promise.all(deletePromises);
+        }
+
+        // 3. Delete the message itself
+        await deleteDoc(doc(db, "messages", messageId));
+        showToast('メッセージを削除しました');
+    } catch (err) {
+        console.error("Error deleting message:", err);
+        showToast('削除に失敗しました');
+    }
 }
 
 // Mark as Read
@@ -935,7 +952,8 @@ function renderReceivedMessages() {
 
     const messages = cachedMessages.filter(m =>
         m.toId === currentUser.userId &&
-        !blocked.includes(m.fromId)
+        !blocked.includes(m.fromId) &&
+        !m.rootId
     );
 
     const senders = {};
@@ -954,21 +972,6 @@ function renderReceivedMessages() {
         }
         senders[msg.fromId].count++;
         if (!msg.isRead) senders[msg.fromId].unread++;
-    });
-
-    // Additional Step: Check for MY replies to these senders to update the "Latest Date"
-    Object.values(senders).forEach(sender => {
-        const myReplies = cachedMessages.filter(m =>
-            m.fromId === currentUser.userId &&
-            m.toId === sender.id
-        );
-        if (myReplies.length > 0) {
-            // Find latest reply
-            const latestReply = myReplies.sort((a, b) => b.createdAt - a.createdAt)[0];
-            if (latestReply.createdAt > sender.lastMessage.createdAt) {
-                sender.lastMessage = latestReply;
-            }
-        }
     });
 
     const listContainer = elements.receivedSendersList;
@@ -1017,10 +1020,17 @@ window.showReceivedDetail = (senderId) => {
     // Mark as read
     markMessagesAsRead(currentUser.userId, senderId, false);
 
+    // Find all root messages of threads we participated in with this sender
+    const threadIds = new Set();
+    cachedMessages.forEach(m => {
+        if ((m.toId === currentUser.userId && m.fromId === senderId) ||
+            (m.fromId === currentUser.userId && m.toId === senderId)) {
+            threadIds.add(m.rootId || m.id);
+        }
+    });
+
     const messages = cachedMessages.filter(m =>
-        m.toId === currentUser.userId &&
-        m.fromId === senderId &&
-        !m.rootId
+        threadIds.has(m.id) && !m.rootId
     ).sort((a, b) => b.createdAt - a.createdAt);
 
     if (messages.length === 0) return;
@@ -1056,7 +1066,8 @@ function renderSentMessages() {
     if (!currentUser) return;
     // Sent messages logic...
     const messages = cachedMessages.filter(m =>
-        m.fromId === currentUser.userId
+        m.fromId === currentUser.userId &&
+        !m.rootId
     );
 
     const recipients = {};
@@ -1113,10 +1124,17 @@ window.showSentDetail = (recipientId) => {
     currentSentPartnerId = recipientId;
     const currentUser = getCurrentUser();
 
+    // Find all root messages of threads we participated in with this recipient
+    const threadIds = new Set();
+    cachedMessages.forEach(m => {
+        if ((m.fromId === currentUser.userId && m.toId === recipientId) ||
+            (m.toId === currentUser.userId && m.fromId === recipientId)) {
+            threadIds.add(m.rootId || m.id);
+        }
+    });
+
     const messages = cachedMessages.filter(m =>
-        m.fromId === currentUser.userId &&
-        m.toId === recipientId &&
-        !m.rootId
+        threadIds.has(m.id) && !m.rootId
     ).sort((a, b) => b.createdAt - a.createdAt);
 
     if (messages.length === 0) return;
