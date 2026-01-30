@@ -240,6 +240,7 @@ let unsubscribeMessages = null;
 let unsubscribeUsers = null;
 let sessionUnreadMessages = new Set();
 let sessionUnreadThreadButtons = new Set();
+let isInitialUsersLoad = true;
 
 // ... (Rest of UI Logic, heavily retained but updated for Async) ...
 // We need to initialize listeners on login (main screen)
@@ -406,6 +407,7 @@ function setupListeners() {
         snapshot.forEach((doc) => {
             cachedUsers.push(doc.data());
         });
+        isInitialUsersLoad = false;
 
         // Refresh my session data in case I was updated (e.g. followed/blocked)
         refreshCurrentUser().then(() => {
@@ -1084,6 +1086,11 @@ function renderReceivedMessages() {
     if (!currentUser) return;
     const blocked = currentUser.blocked || [];
 
+    if (isInitialMessagesLoad) {
+        if (elements.receivedSendersList) elements.receivedSendersList.innerHTML = '<div class="loading-spinner"></div>';
+        return;
+    }
+
     const messages = cachedMessages.filter(m =>
         m.toId === currentUser.userId &&
         !blocked.includes(m.fromId) &&
@@ -1267,6 +1274,11 @@ function renderSentMessages() {
         !m.rootId
     );
 
+    if (isInitialMessagesLoad) {
+        if (elements.sentRecipientsList) elements.sentRecipientsList.innerHTML = '<div class="loading-spinner"></div>';
+        return;
+    }
+
     const recipients = {};
     messages.forEach(msg => {
         if (!recipients[msg.toId]) {
@@ -1427,6 +1439,12 @@ function renderFollowingList() {
     const followingIds = currentUser.following || [];
     const container = elements.followingList;
     container.innerHTML = '';
+
+    if (isInitialUsersLoad) {
+        container.innerHTML = '<div class="loading-spinner"></div>';
+        return;
+    }
+
     const followingUsers = cachedUsers.filter(u => followingIds.includes(u.userId));
 
     if (followingUsers.length === 0) {
@@ -1444,6 +1462,13 @@ function renderFollowerList() {
     if (!currentUser || !elements.followerList) return;
     const container = elements.followerList;
     container.innerHTML = '';
+
+
+    if (isInitialUsersLoad) {
+        container.innerHTML = '<div class="loading-spinner"></div>';
+        return;
+    }
+
     // Filter users who follow me
     const followers = cachedUsers.filter(u => u.following && u.following.includes(currentUser.userId));
 
@@ -1462,6 +1487,13 @@ function renderBlockedList() {
     const blockedIds = currentUser.blocked || [];
     const container = elements.blockedList;
     container.innerHTML = '';
+
+
+    if (isInitialUsersLoad) {
+        container.innerHTML = '<div class="loading-spinner"></div>';
+        return;
+    }
+
     const blockedUsers = cachedUsers.filter(u => blockedIds.includes(u.userId));
 
     if (blockedUsers.length === 0) {
@@ -1615,7 +1647,13 @@ function renderProfileModal(user) {
 function renderTimeline() {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
+    if (!currentUser) return;
     const blocked = currentUser.blocked || [];
+
+    if (isInitialMessagesLoad) {
+        if (elements.timelineList) elements.timelineList.innerHTML = '<div class="loading-spinner"></div>';
+        return;
+    }
 
     // 1. Calculate latest timestamp for each thread
     const threadLatest = {};
