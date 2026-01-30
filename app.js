@@ -804,6 +804,15 @@ window.toggleBlock = async (targetUserId) => {
         elements.modalThanksBtn.disabled = !isFollowing;
         elements.modalThanksBtn.className = isFollowing ? 'btn btn-success profile-action-btn' : 'btn btn-disabled-white profile-action-btn';
         elements.modalThanksBtn.style.opacity = '1';
+
+        // Update follows-you badge immediately
+        if (isBlocked) {
+            // Just unblocked. Follows-you remains false (since block removed it)
+            elements.modalFollowsYouBadge.classList.add('hidden');
+        } else {
+            // Just blocked. Hide it.
+            elements.modalFollowsYouBadge.classList.add('hidden');
+        }
     }
 
     // 2. Refresh Lists (Blocked list, etc)
@@ -1224,8 +1233,9 @@ function renderSearchResult() {
         container.innerHTML = '';
         return;
     }
-    // Strict match for User ID only
-    const results = cachedUsers.filter(u => u.userId === queryStr);
+    // Strict match for User ID only, excluding self
+    const currentUser = getCurrentUser();
+    const results = cachedUsers.filter(u => u.userId === queryStr && u.userId !== currentUser.userId);
 
     if (results.length === 0) {
         container.innerHTML = '<p style="text-align:center; padding:16px; color:var(--text-light);">ユーザーIDが完全に一致するユーザーは見つかりませんでした</p>';
