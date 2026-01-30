@@ -857,7 +857,7 @@ function renderSentMessages() {
         div.innerHTML = `
              <div class="message-header">
                 <span class="message-to" style="font-weight:bold; font-size:1.1em; cursor:pointer;" onclick="event.stopPropagation(); window.showUserProfile('${pf.id}')">
-                    To: ${escapeHtml(pf.name)}
+                    ${escapeHtml(pf.name)}
                 </span>
             </div>
              <div class="message-body" style="margin-top:8px;">
