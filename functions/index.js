@@ -32,11 +32,14 @@ exports.sendNotificationOnMessage = functions.firestore
             return null;
         }
 
-        // Construct Notification Payload
+        // Construct Notification Payload (Data Message)
+        // Using 'data' prevent automatic display, allowing SW to handle it exclusively.
         const payload = {
-            notification: {
+            data: {
                 title: `ありがとうが届きました！`,
-                body: `${senderName}さん: ${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}`
+                body: `${senderName}さん: ${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}`,
+                icon: '/assets/logo.png',
+                url: '/top.html'
             },
             token: fcmToken
         };

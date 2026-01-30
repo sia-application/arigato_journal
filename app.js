@@ -162,6 +162,14 @@ async function deleteMessage(messageId) {
         // 3. Delete the message itself
         await deleteDoc(doc(db, "messages", messageId));
         showToast('メッセージを削除しました');
+        // Clear New Badge when switching to History tabs
+        if (tabId === 'received' || tabId === 'sent') {
+            localStorage.setItem('arigato_last_viewed_history', Date.now().toString());
+            // Re-render Timeline to remove badges if we switch back immediately? 
+            // No need to re-render timeline now, but next time we view it, badges will be gone.
+            // Actually, user might switch back to timeline immediately appropriately.
+            // Let's force re-render timeline if it's currently rendered? No, we are hiding it.
+        }
     } catch (err) {
         console.error("Error deleting message:", err);
         showToast('削除に失敗しました');
@@ -430,13 +438,8 @@ function setupListeners() {
         });
     });
 
-    // Handle Foreground Messages
-    onMessage(messaging, (payload) => {
-        console.log('Message received. ', payload);
-        // Foreground notification disabled by user request
-        // const { title, body } = payload.notification;
-        // showToast(`🔔 ${title}: ${body}`);
-    });
+    // Foreground messages handled silently
+    // onMessage(messaging, (payload) => { console.log('Foreground message received', payload); });
 }
 
 
@@ -621,6 +624,22 @@ function showToast(message) {
 }
 
 // ... Card Creation ...
+// Helper to check if message is "New" for timeline
+// Helper to check if message is "New" for timeline
+function isMessageUnreadForTimeline(message) {
+    const currentUser = getCurrentUser();
+    if (!currentUser || message.toId !== currentUser.userId) return false;
+
+    // If already read in DB, it is NOT new
+    if (message.isRead) return false;
+
+    // Check localStorage timestamp
+    const lastViewed = localStorage.getItem('arigato_last_viewed_history');
+    if (!lastViewed) return true; // Never viewed, so everything received is new
+
+    return message.createdAt > parseInt(lastViewed);
+}
+
 function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread = false) {
     const currentUser = getCurrentUser();
     const isOwn = msg.fromId === currentUser.userId;
@@ -642,15 +661,22 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
     const deleteBtn = isOwn ? `<button class="delete-btn" onclick="window.deleteMessage('${msg.id}')">🗑️</button>` : '';
 
     // User Display
-    let userDisplay = '';
     const nameStyle = 'cursor:pointer; text-decoration:underline;';
 
-    // New badge for session-unread or thread-unread
-    const isSessionNew = sessionUnreadMessages.has(msg.id) || (isUnreadThread && type !== 'thread');
-    const sessionNewBadge = isSessionNew ?
-        '<span class="new-badge-inline">New</span>' : '';
-    const threadBtnWithBadge = `<div style="display:inline-flex; align-items:center;">${threadBtn}${sessionNewBadge}</div>`;
+    // New badge logic
+    // 1. Session unread (for history tabs)
+    // 2. Thread unread
+    // 3. Timeline persisted unread
+    const isNew = (type === 'timeline' && isMessageUnreadForTimeline(msg)) ||
+        sessionUnreadMessages.has(msg.id) ||
+        (isUnreadThread && type !== 'thread');
 
+    const newBadgeHtml = isNew ? '<span class="new-badge">New</span>' : '';
+
+    // Combine Button and Badge
+    const threadBtnWithBadge = `<div style="display:inline-flex; align-items:center;">${threadBtn}${newBadgeHtml}</div>`;
+
+    let userDisplay = '';
     if (type === 'timeline') {
         userDisplay = `
             <div class="message-users">
@@ -662,10 +688,9 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
             </div>
         `;
     } else if (type === 'received') {
-        const showDot = isSessionNew;
+        const showDot = isNew;
         userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>${showDot ? '<span class="unread-dot"></span>' : ''}${threadBtnWithBadge}${deleteBtn}</div>`;
     } else if (type === 'sent') {
-        // Dot is removed in Sent Detail view as per user request
         userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span>${threadBtnWithBadge}${deleteBtn}</div>`;
     }
     else if (type === 'thread') {
@@ -680,7 +705,6 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
     // Time & Badges
     const timeToUse = latestTime || msg.createdAt;
     const timeLabel = latestTime ? '最新: ' : '';
-    let extraBadges = '';
 
     return `
         <div class="${cardClass}" id="msg-${msg.id}">
@@ -689,9 +713,8 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
                 ${type !== 'thread' ? `
                 <div class="message-meta" style="font-size: 0.8em; color: var(--text-secondary); display:flex; flex-direction: column; align-items: flex-end; gap: 4px;">
                     <div>${timeLabel}${formatDate(timeToUse)}</div>
-                    ${(msg.isRead === false && msg.toId === currentUser.userId) ?
-                (type === 'received' || type === 'sent' ? '<span class="unread-dot"></span>' : '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.8em;">New</span>')
-                : ''}
+                    ${(msg.isRead === false && msg.toId === currentUser.userId && (type === 'received' || type === 'sent')) ?
+                '<span class="unread-dot"></span>' : ''} 
                 </div>` : ''}
             </div>
 
@@ -1236,6 +1259,7 @@ window.showReceivedDetail = (senderId, options = {}) => {
     const currentUser = getCurrentUser();
 
     // 1. Snapshot unread status before marking as read to show "New" badge in this session
+    // 1. Snapshot unread status before marking as read to show "New" badge in this session
     if (!options.skipSnapshot) {
         const currentUserMessages = cachedMessages.filter(m => m.toId === currentUser.userId && m.fromId === senderId && !m.isRead);
         currentUserMessages.forEach(m => {
@@ -1267,15 +1291,6 @@ window.showReceivedDetail = (senderId, options = {}) => {
         backToReceivedList();
         return;
     }
-
-    // Reset limit if it is a fresh open (not a re-render from listener or load more)
-    // Actually, we should probably reset only if senderId changes, but showReceivedDetail is called by click.
-    // To distinguish "Update" vs "New Open", we check if currentReceivedPartnerId was already this ID.
-    // However, the function sets currentReceivedPartnerId = senderId at the very top.
-    // So we should rely on a passed option or just check if the limit is default?
-    // Better: If we are here from a click on the list, we likely want to reset.
-    // If we are here from "Load More", we shouldn't reset.
-    // But "Load More" calls render... wait, Load More should call showReceivedDetail(id).
 
     if (!options.keepLimit) {
         receivedDetailLimit = 20;
@@ -1413,6 +1428,7 @@ window.showSentDetail = (recipientId, options = {}) => {
     currentSentPartnerId = recipientId;
     const currentUser = getCurrentUser();
 
+    // 1. Snapshot unread replies (messages sent TO me from this partner in my sent threads)
     // 1. Snapshot unread replies (messages sent TO me from this partner in my sent threads)
     if (!options.skipSnapshot) {
         const currentUserReplies = cachedMessages.filter(m => m.toId === currentUser.userId && m.fromId === recipientId && !m.isRead);
@@ -1765,6 +1781,11 @@ function renderTimeline() {
 function initialize() {
     initializeElements();
     setupPullToRefresh();
+
+    // Initialize New Badge Reference Time if not present
+    if (!localStorage.getItem('arigato_last_viewed_history')) {
+        localStorage.setItem('arigato_last_viewed_history', Date.now().toString());
+    }
 
     // Register Service Worker for Notifications/PWA
     if ('serviceWorker' in navigator) {
