@@ -468,7 +468,8 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
             <div class="message-header">
                 ${userDisplay}
                 ${type !== 'thread' ? `
-                <div class="message-meta" style="font-size: 0.8em; color: var(--text-secondary);">
+                <div class="message-meta" style="font-size: 0.8em; color: var(--text-secondary); display:flex; align-items:center;">
+                    ${(msg.isRead === false && msg.toId === currentUser.userId) ? '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.8em; margin-right:6px;">New</span>' : ''}
                     ${timeLabel}${formatDate(timeToUse)}
                 </div>` : ''}
             </div>
@@ -580,22 +581,55 @@ window.showUserProfile = async (userId) => {
 };
 
 window.toggleFollow = async (targetUserId) => {
-    const currentUser = await refreshCurrentUser();
+    let currentUser = await refreshCurrentUser();
     if (!currentUser) return;
 
     const userRef = doc(db, "users", currentUser.userId);
-    const following = currentUser.following || [];
+    let isFollowing = currentUser.following && currentUser.following.includes(targetUserId);
 
-    if (following.includes(targetUserId)) {
+    // Toggle logic
+    if (isFollowing) {
         await updateDoc(userRef, {
             following: arrayRemove(targetUserId)
         });
         showToast('フォローを解除しました');
+        isFollowing = false; // Update local state immediately
     } else {
         await updateDoc(userRef, {
             following: arrayUnion(targetUserId)
         });
         showToast('フォローしました');
+        isFollowing = true;
+    }
+
+    // Refresh global state
+    currentUser = await refreshCurrentUser();
+
+    // 1. Update Profile Modal if Open
+    if (elements.profileModal.classList.contains('show') && currentProfileUserId === targetUserId) {
+        elements.modalActionBtn.textContent = isFollowing ? 'フォロー解除' : 'フォローする';
+        elements.modalActionBtn.className = isFollowing ? 'btn btn-outline' : 'btn btn-primary';
+
+        // Optimistically update follower count on the modal
+        const currentCount = parseInt(elements.followerCount.textContent) || 0;
+        elements.followerCount.textContent = isFollowing ? currentCount + 1 : Math.max(0, currentCount - 1);
+    }
+
+    // 2. Update Buttons in Lists (Search, Friends, Followers)
+    const btns = document.querySelectorAll(`button[onclick="window.toggleFollow('${targetUserId}')"]`);
+    btns.forEach(btn => {
+        // Different text logic based on context, but generally:
+        if (btn.closest('.user-card')) {
+            btn.textContent = isFollowing ? '解除' : 'フォロー';
+            btn.className = `btn btn-sm ${isFollowing ? 'btn-outline' : 'btn-primary'}`;
+        }
+    });
+
+    // 3. If in Friends Tab, refresh lists to move/remove users if needed
+    const activeTab = document.querySelector('.tab-btn.active');
+    if (activeTab && activeTab.dataset.tab === 'friends') {
+        renderFollowingList();
+        renderFollowerList();
     }
 };
 
@@ -648,6 +682,7 @@ window.openThread = (msgId) => {
 
 // ... Render Implementations needed for window.openThread etc to work ...
 let currentThreadContext = null;
+let currentProfileUserId = null;
 let currentReceivedPartnerId = null;
 let currentSentPartnerId = null;
 
@@ -721,7 +756,6 @@ function renderReceivedMessages() {
 
     const messages = cachedMessages.filter(m =>
         m.toId === currentUser.userId &&
-        !m.rootId &&
         !blocked.includes(m.fromId)
     );
 
@@ -741,6 +775,21 @@ function renderReceivedMessages() {
         }
         senders[msg.fromId].count++;
         if (!msg.isRead) senders[msg.fromId].unread++;
+    });
+
+    // Additional Step: Check for MY replies to these senders to update the "Latest Date"
+    Object.values(senders).forEach(sender => {
+        const myReplies = cachedMessages.filter(m =>
+            m.fromId === currentUser.userId &&
+            m.toId === sender.id
+        );
+        if (myReplies.length > 0) {
+            // Find latest reply
+            const latestReply = myReplies.sort((a, b) => b.createdAt - a.createdAt)[0];
+            if (latestReply.createdAt > sender.lastMessage.createdAt) {
+                sender.lastMessage = latestReply;
+            }
+        }
     });
 
     const listContainer = elements.receivedSendersList;
@@ -801,7 +850,19 @@ window.showReceivedDetail = (senderId) => {
     elements.receivedMessagesDetail.classList.remove('hidden');
     elements.detailSenderName.textContent = messages[0].fromName; // Use latest name
 
-    elements.detailMessagesList.innerHTML = messages.map(msg => createMessageCard(msg, 'received')).join('');
+    // Calculate Latest Dates including replies
+    const threadLatest = {};
+    cachedMessages.forEach(m => {
+        const rootId = m.rootId || m.id;
+        if (!threadLatest[rootId] || m.createdAt > threadLatest[rootId]) {
+            threadLatest[rootId] = m.createdAt;
+        }
+    });
+
+    elements.detailMessagesList.innerHTML = messages.map(msg => {
+        const latestAt = threadLatest[msg.id] || msg.createdAt;
+        return createMessageCard(msg, 'received', latestAt);
+    }).join('');
 }
 
 window.backToReceivedList = () => {
@@ -816,8 +877,7 @@ function renderSentMessages() {
     if (!currentUser) return;
     // Sent messages logic...
     const messages = cachedMessages.filter(m =>
-        m.fromId === currentUser.userId &&
-        !m.rootId
+        m.fromId === currentUser.userId
     );
 
     const recipients = {};
@@ -886,7 +946,19 @@ window.showSentDetail = (recipientId) => {
     elements.sentMessagesDetail.classList.remove('hidden');
     elements.detailRecipientName.textContent = messages[0].toName;
 
-    elements.detailSentMessagesList.innerHTML = messages.map(msg => createMessageCard(msg, 'sent')).join('');
+    // Calculate Latest Dates including replies
+    const threadLatest = {};
+    cachedMessages.forEach(m => {
+        const rootId = m.rootId || m.id;
+        if (!threadLatest[rootId] || m.createdAt > threadLatest[rootId]) {
+            threadLatest[rootId] = m.createdAt;
+        }
+    });
+
+    elements.detailSentMessagesList.innerHTML = messages.map(msg => {
+        const latestAt = threadLatest[msg.id] || msg.createdAt;
+        return createMessageCard(msg, 'sent', latestAt);
+    }).join('');
 };
 
 window.backToSentList = () => {
@@ -977,6 +1049,7 @@ function updateRecipientSelect(friends) {
 }
 
 function renderProfileModal(user) {
+    currentProfileUserId = user.userId;
     const currentUser = getCurrentUser();
     if (!currentUser) return;
 
@@ -1049,6 +1122,16 @@ function renderTimeline() {
     if (!currentUser) return;
     const blocked = currentUser.blocked || [];
 
+    // 1. Calculate latest timestamp for each thread
+    const threadLatest = {};
+    cachedMessages.forEach(m => {
+        const rootId = m.rootId || m.id;
+        if (!threadLatest[rootId] || m.createdAt > threadLatest[rootId]) {
+            threadLatest[rootId] = m.createdAt;
+        }
+    });
+
+    // 2. Filter for visible root messages
     const messages = cachedMessages.filter(m =>
         (m.fromId === currentUser.userId || m.toId === currentUser.userId) &&
         !m.rootId &&
@@ -1058,7 +1141,19 @@ function renderTimeline() {
     if (messages.length === 0) {
         elements.timelineList.innerHTML = '<div class="empty-state"><span class="empty-icon">📱</span><p>まだメッセージはありません</p></div>';
     } else {
-        const html = messages.sort((a, b) => b.createdAt - a.createdAt).map(msg => createMessageCard(msg, 'timeline')).join('');
+        // 3. Sort by calculated latest timestamp
+        const sortedMessages = messages.sort((a, b) => {
+            const timeA = threadLatest[a.id] || a.createdAt;
+            const timeB = threadLatest[b.id] || b.createdAt;
+            return timeB - timeA;
+        });
+
+        // 4. Render
+        const html = sortedMessages.map(msg => {
+            const latestAt = threadLatest[msg.id] || msg.createdAt;
+            return createMessageCard(msg, 'timeline', latestAt);
+        }).join('');
+
         elements.timelineList.innerHTML = html;
     }
 }
