@@ -516,7 +516,7 @@ async function requestNotificationPermission() {
 
             // Get FCM Token
             // VAPID Key: Replace with your actual key from Firebase Console
-            const vapidKey = 'YOUR_VAPID_KEY';
+            const vapidKey = 'BDGbx329T5nJgatWeRlp3ejTvRkY6OBOjiZTVhcYW8ub2HW3xvs6yaFSRzc5zXY2vME2XGZJqpKz5e92Rlf1rFg';
 
             try {
                 const token = await getToken(messaging, { vapidKey: vapidKey });
