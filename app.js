@@ -953,8 +953,7 @@ function renderReceivedMessages() {
 
     const messages = cachedMessages.filter(m =>
         m.toId === currentUser.userId &&
-        !blocked.includes(m.fromId) &&
-        !m.rootId
+        !blocked.includes(m.fromId)
     );
 
     const senders = {};
@@ -1021,17 +1020,9 @@ window.showReceivedDetail = (senderId) => {
     // Mark as read
     markMessagesAsRead(currentUser.userId, senderId, false);
 
-    // Find all root messages of threads we participated in with this sender
-    const threadIds = new Set();
-    cachedMessages.forEach(m => {
-        if ((m.toId === currentUser.userId && m.fromId === senderId) ||
-            (m.fromId === currentUser.userId && m.toId === senderId)) {
-            threadIds.add(m.rootId || m.id);
-        }
-    });
-
+    // Show ONLY messages I received from this sender
     const messages = cachedMessages.filter(m =>
-        threadIds.has(m.id) && !m.rootId
+        m.toId === currentUser.userId && m.fromId === senderId
     ).sort((a, b) => b.createdAt - a.createdAt);
 
     if (messages.length === 0) {
@@ -1044,18 +1035,8 @@ window.showReceivedDetail = (senderId) => {
     elements.receivedMessagesDetail.classList.remove('hidden');
     elements.detailSenderName.textContent = messages[0].fromName; // Use latest name
 
-    // Calculate Latest Dates including replies
-    const threadLatest = {};
-    cachedMessages.forEach(m => {
-        const rootId = m.rootId || m.id;
-        if (!threadLatest[rootId] || m.createdAt > threadLatest[rootId]) {
-            threadLatest[rootId] = m.createdAt;
-        }
-    });
-
     elements.detailMessagesList.innerHTML = messages.map(msg => {
-        const latestAt = threadLatest[msg.id] || msg.createdAt;
-        return createMessageCard(msg, 'received', latestAt);
+        return createMessageCard(msg, 'received');
     }).join('');
 }
 
@@ -1071,8 +1052,7 @@ function renderSentMessages() {
     if (!currentUser) return;
     // Sent messages logic...
     const messages = cachedMessages.filter(m =>
-        m.fromId === currentUser.userId &&
-        !m.rootId
+        m.fromId === currentUser.userId
     );
 
     const recipients = {};
@@ -1129,17 +1109,9 @@ window.showSentDetail = (recipientId) => {
     currentSentPartnerId = recipientId;
     const currentUser = getCurrentUser();
 
-    // Find all root messages of threads we participated in with this recipient
-    const threadIds = new Set();
-    cachedMessages.forEach(m => {
-        if ((m.fromId === currentUser.userId && m.toId === recipientId) ||
-            (m.toId === currentUser.userId && m.fromId === recipientId)) {
-            threadIds.add(m.rootId || m.id);
-        }
-    });
-
+    // Show ONLY messages I sent to this recipient
     const messages = cachedMessages.filter(m =>
-        threadIds.has(m.id) && !m.rootId
+        m.fromId === currentUser.userId && m.toId === recipientId
     ).sort((a, b) => b.createdAt - a.createdAt);
 
     if (messages.length === 0) {
@@ -1152,18 +1124,8 @@ window.showSentDetail = (recipientId) => {
     elements.sentMessagesDetail.classList.remove('hidden');
     elements.detailRecipientName.textContent = messages[0].toName;
 
-    // Calculate Latest Dates including replies
-    const threadLatest = {};
-    cachedMessages.forEach(m => {
-        const rootId = m.rootId || m.id;
-        if (!threadLatest[rootId] || m.createdAt > threadLatest[rootId]) {
-            threadLatest[rootId] = m.createdAt;
-        }
-    });
-
     elements.detailSentMessagesList.innerHTML = messages.map(msg => {
-        const latestAt = threadLatest[msg.id] || msg.createdAt;
-        return createMessageCard(msg, 'sent', latestAt);
+        return createMessageCard(msg, 'sent');
     }).join('');
 };
 
