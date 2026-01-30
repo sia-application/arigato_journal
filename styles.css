@@ -787,6 +787,16 @@ body::after {
     border-color: var(--pink-400);
 }
 
+.unread-thread-btn {
+    background: var(--pink-500) !important;
+    border-color: var(--pink-600) !important;
+    color: white !important;
+}
+
+.unread-thread-btn:hover {
+    background: var(--pink-600) !important;
+}
+
 .new-badge-inline {
     background-color: var(--pink-500);
     color: white !important;

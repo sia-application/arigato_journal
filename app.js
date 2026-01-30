@@ -232,6 +232,7 @@ let currentReplyContext = null;
 let unsubscribeMessages = null;
 let unsubscribeUsers = null;
 let sessionUnreadMessages = new Set();
+let sessionUnreadThreadButtons = new Set();
 
 // ... (Rest of UI Logic, heavily retained but updated for Async) ...
 // We need to initialize listeners on login (main screen)
@@ -509,8 +510,12 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
         cardClass += ' unread';
     }
 
-    // Thread Button
-    const threadBtn = `<button class="reply-btn" onclick="window.openThread('${msg.id}')">💬 スレッド</button>`;
+    // Thread Button & Unread logical check
+    const hasUnreadReplies = cachedMessages.some(m => m.rootId === msg.id && m.toId === currentUser.userId && !m.isRead);
+    const isUnreadThread = sessionUnreadThreadButtons.has(msg.id) || hasUnreadReplies;
+
+    const threadBtnClass = isUnreadThread ? 'reply-btn unread-thread-btn' : 'reply-btn';
+    const threadBtn = `<button class="${threadBtnClass}" onclick="window.openThread('${msg.id}')">💬 スレッド</button>`;
 
     // Delete Button (only own)
     const deleteBtn = isOwn ? `<button class="delete-btn" onclick="window.deleteMessage('${msg.id}')">🗑️</button>` : '';
@@ -519,8 +524,9 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
     let userDisplay = '';
     const nameStyle = 'cursor:pointer; text-decoration:underline;';
 
-    // New badge for session-unread
-    const sessionNewBadge = sessionUnreadMessages.has(msg.id) ?
+    // New badge for session-unread or thread-unread
+    const isSessionNew = sessionUnreadMessages.has(msg.id) || (isUnreadThread && type !== 'thread');
+    const sessionNewBadge = isSessionNew ?
         '<span class="new-badge-inline">New</span>' : '';
     const threadBtnWithBadge = `<div style="display:inline-flex; align-items:center;">${threadBtn}${sessionNewBadge}</div>`;
 
@@ -535,9 +541,11 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
             </div>
         `;
     } else if (type === 'received') {
-        userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>${(msg.isRead === false && msg.toId === currentUser.userId) ? '<span class="unread-dot"></span>' : ''}${threadBtnWithBadge}${deleteBtn}</div>`;
+        const showDot = (msg.isRead === false && msg.toId === currentUser.userId) || hasUnreadReplies;
+        userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>${showDot ? '<span class="unread-dot"></span>' : ''}${threadBtnWithBadge}${deleteBtn}</div>`;
     } else if (type === 'sent') {
-        userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span>${(msg.isRead === false && msg.toId === currentUser.userId) ? '<span class="unread-dot"></span>' : ''}${threadBtnWithBadge}${deleteBtn}</div>`;
+        const showDot = (msg.isRead === false && msg.toId === currentUser.userId) || hasUnreadReplies;
+        userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span>${showDot ? '<span class="unread-dot"></span>' : ''}${threadBtnWithBadge}${deleteBtn}</div>`;
     }
     else if (type === 'thread') {
         userDisplay = `
@@ -1075,7 +1083,11 @@ window.showReceivedDetail = (senderId) => {
 
     // 1. Snapshot unread status before marking as read to show "New" badge in this session
     const currentUserMessages = cachedMessages.filter(m => m.toId === currentUser.userId && m.fromId === senderId && !m.isRead);
-    currentUserMessages.forEach(m => sessionUnreadMessages.add(m.id));
+    currentUserMessages.forEach(m => {
+        sessionUnreadMessages.add(m.id);
+        if (m.rootId) sessionUnreadThreadButtons.add(m.rootId);
+        else sessionUnreadThreadButtons.add(m.id);
+    });
 
     // Mark as read (Only received messages/replies)
     markMessagesAsRead(currentUser.userId, senderId, { type: 'received' });
@@ -1197,7 +1209,10 @@ window.showSentDetail = (recipientId) => {
 
     // 1. Snapshot unread replies (messages sent TO me from this partner in my sent threads)
     const currentUserReplies = cachedMessages.filter(m => m.toId === currentUser.userId && m.fromId === recipientId && !m.isRead);
-    currentUserReplies.forEach(m => sessionUnreadMessages.add(m.id));
+    currentUserReplies.forEach(m => {
+        sessionUnreadMessages.add(m.id);
+        if (m.rootId) sessionUnreadThreadButtons.add(m.rootId);
+    });
 
     // Mark as read (Only unread replies in my sent threads)
     markMessagesAsRead(currentUser.userId, recipientId, { type: 'sent' });
@@ -1566,6 +1581,7 @@ function initialize() {
 // Tab Switching
 function switchTab(tabName) {
     sessionUnreadMessages.clear();
+    sessionUnreadThreadButtons.clear();
     elements.tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
     elements.tabContents.forEach(content => content.classList.toggle('active', content.id === `tab-${tabName}`));
 
