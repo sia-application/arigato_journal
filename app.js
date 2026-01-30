@@ -369,6 +369,7 @@ function setupListeners() {
                 renderFollowingList();
                 renderFollowerList();
                 renderBlockedList();
+                renderSearchResult();
             }
         });
     });
@@ -565,7 +566,11 @@ async function handleLogin(e) {
         setTimeout(() => window.location.href = 'top.html', 1000);
     } catch (err) {
         console.error(err);
-        showToast('ログイン中にエラーが発生しました');
+        if (err.code === 'unavailable' || err.message.includes('offline')) {
+            showToast('オフラインのためログインできません。インターネット接続を確認してください。');
+        } else {
+            showToast('ログイン中にエラーが発生しました');
+        }
     }
 }
 
@@ -872,8 +877,9 @@ function renderUserCard(user, type = 'following') {
     const isFollowing = currentUser.following && currentUser.following.includes(user.userId);
     const isBlocked = currentUser.blocked && currentUser.blocked.includes(user.userId);
 
-    // Check if they follow you
+    // Check if they follow you / block you
     const followsYou = user.following && user.following.includes(currentUser.userId);
+    const blocksYou = user.blocked && user.blocked.includes(currentUser.userId);
 
     let actionBtn = '';
     let thanksBtn = '';
@@ -882,9 +888,6 @@ function renderUserCard(user, type = 'following') {
         // Shared Thanks Button Logic
         const thanksClass = isFollowing ? 'btn btn-sm btn-success' : 'btn btn-sm btn-disabled-white';
         const thanksDisabled = !isFollowing ? 'disabled' : '';
-        const thanksOpacity = isFollowing ? '1' : '1'; // btn-disabled-white handles look
-        // Actually btn-disabled-white sets color, but opacity might be needed if base btn styles interfere. 
-        // Let's rely on class.
 
         thanksBtn = `<button class="${thanksClass}" 
             style="margin-right: 4px;"
@@ -893,37 +896,15 @@ function renderUserCard(user, type = 'following') {
             ありがとうを送る
         </button>`;
 
-        if (isBlocked) {
-            // Blocked State (Priority over Search/Friends logic if blocked)
-            // User requested "Show Blocking" in follower list if blocked.
-            // Actually 'type' arg is used to distinguish context.
-            // But if I block someone, I usually want to see "Blocking" regardless of list type?
-            // "Blocked List" type specifically asks for "Unblock" (kaijo).
-            // "Follower List" type: if blocked, show "Blocking".
-
-            if (type === 'blocked') {
-                actionBtn = `<button class="btn btn-sm btn-outline" onclick="window.toggleBlock('${user.userId}')">解除</button>`;
-            } else {
-                // In Search or Following/Follower lists, if blocked, show "Blocking"
-                actionBtn = `<button class="btn btn-sm btn-blocking" onclick="window.toggleBlock('${user.userId}')">ブロック中</button>`;
-            }
+        if (isBlocked || blocksYou) {
+            // Blocked State (Priority over Search/Friends logic)
+            // Use btn-blocking for both cases as requested
+            actionBtn = `<button class="btn btn-sm btn-blocking" onclick="window.toggleBlock('${user.userId}')">ブロック中</button>`;
         } else {
             // Not Blocked
-            actionBtn = `<button class="btn btn-sm ${isFollowing ? 'btn-primary' : 'btn-primary'}" onclick="window.toggleFollow('${user.userId}')">
-                ${isFollowing ? 'フォロー中' : 'フォロー'}
+            actionBtn = `<button class="btn btn-sm btn-primary" onclick="window.toggleFollow('${user.userId}')">
+                ${isFollowing ? 'フォロー中' : 'フォローする'}
             </button>`;
-            if (isFollowing) {
-                // If following, ensure btn-primary is used (already set above)
-                // Wait, "Follow" (not following) is also btn-primary per recent changes?
-                // Yes, user wanted "Following" -> btn-primary. "Follow" is also btn-primary usually?
-                // Let's check previous logic.
-                // Previous: btn.className = 'btn btn-sm btn-primary'; for both.
-            } else {
-                // Follow
-                actionBtn = `<button class="btn btn-sm btn-primary" onclick="window.toggleFollow('${user.userId}')">
-                    フォローする
-                </button>`;
-            }
         }
     }
 
