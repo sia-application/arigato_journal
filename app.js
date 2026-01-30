@@ -1149,7 +1149,13 @@ function initialize() {
             });
         }
 
+        // Thread Reply
+        if (elements.threadReplyForm) {
+            elements.threadReplyForm.addEventListener('submit', handleThreadReply);
+        }
+
     }
+
 }
 
 // Tab Switching
@@ -1236,6 +1242,28 @@ async function handleAvatarUpload(e) {
     if (!file) return;
     showToast('画像のアップロード機能は現在Emoijのみ対応しています（将来的にStorageに対応予定）');
 }
+
+async function handleThreadReply(e) {
+    e.preventDefault();
+    const message = elements.threadInput.value.trim();
+    if (!message || !currentThreadContext) return;
+
+    try {
+        await sendMessage(
+            currentThreadContext.otherUserId,
+            currentThreadContext.otherUserName,
+            message,
+            { rootId: currentThreadContext.rootId }
+        );
+        elements.threadInput.value = '';
+        renderThreadMessages(); // Optimistic update or wait for listener? Listener handles it but better to scroll
+        // renderThreadMessages will be called by listener eventually, but we might want immediate feedback
+    } catch (err) {
+        console.error(err);
+        showToast('返信の送信に失敗しました');
+    }
+}
+
 
 
 // Start
