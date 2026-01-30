@@ -281,6 +281,7 @@ function initializeElements() {
         elements.usernameEdit = document.getElementById('username-edit');
         elements.modalUserid = document.getElementById('modal-userid');
         elements.modalFollowsYouBadge = document.getElementById('modal-follows-you-badge');
+        elements.modalBlocksYouBadge = document.getElementById('modal-blocks-you-badge');
         elements.profileAvatarDisplay = document.getElementById('profile-avatar-display');
         elements.followingCount = document.getElementById('following-count');
         elements.followerCount = document.getElementById('follower-count');
@@ -1316,20 +1317,25 @@ function renderProfileModal(user) {
         // Other User
         // const isFollowing = ... already calculated above
         const isBlocked = currentUser.blocked && currentUser.blocked.includes(user.userId);
+        const blocksYou = user.blocked && user.blocked.includes(currentUser.userId);
 
         // Follow Button Logic
         if (isBlocked) {
             elements.modalActionBtn.textContent = 'フォロー不可';
             elements.modalActionBtn.className = 'btn btn-disabled-white profile-action-btn';
+            elements.modalActionBtn.disabled = true;
+        } else if (blocksYou) {
+            elements.modalActionBtn.textContent = 'フォロー不可';
+            elements.modalActionBtn.className = 'btn btn-disabled-white profile-action-btn';
+            elements.modalActionBtn.disabled = true;
         } else {
             elements.modalActionBtn.textContent = isFollowing ? 'フォロー中' : 'フォローする';
             elements.modalActionBtn.className = 'btn btn-primary profile-action-btn';
+            elements.modalActionBtn.disabled = false;
         }
         elements.modalActionBtn.onclick = () => window.toggleFollow(user.userId);
         elements.modalActionBtn.classList.remove('hidden');
 
-        // Disable Follow button if blocked
-        elements.modalActionBtn.disabled = isBlocked;
         elements.modalActionBtn.style.opacity = '1';
 
         // Thanks Button Logic
@@ -1357,6 +1363,8 @@ function renderProfileModal(user) {
 
         const followsYou = user.following && user.following.includes(currentUser.userId);
         followsYou ? elements.modalFollowsYouBadge.classList.remove('hidden') : elements.modalFollowsYouBadge.classList.add('hidden');
+
+        blocksYou ? elements.modalBlocksYouBadge.classList.remove('hidden') : elements.modalBlocksYouBadge.classList.add('hidden');
     }
 
     elements.profileModal.classList.remove('hidden');
