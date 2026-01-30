@@ -608,11 +608,12 @@ window.toggleFollow = async (targetUserId) => {
     // 1. Update Profile Modal if Open
     if (elements.profileModal.classList.contains('show') && currentProfileUserId === targetUserId) {
         elements.modalActionBtn.textContent = isFollowing ? 'フォロー中' : 'フォローする';
-        elements.modalActionBtn.className = isFollowing ? 'btn btn-outline' : 'btn btn-primary';
+        elements.modalActionBtn.className = 'btn btn-primary profile-action-btn';
 
         // Update Thanks Button state
         elements.modalThanksBtn.disabled = !isFollowing;
-        elements.modalThanksBtn.style.opacity = isFollowing ? '1' : '0.5';
+        elements.modalThanksBtn.className = isFollowing ? 'btn btn-success profile-action-btn' : 'btn btn-disabled-white profile-action-btn';
+        elements.modalThanksBtn.style.opacity = '1';
 
         // Optimistically update follower count on the modal
         const currentCount = parseInt(elements.followerCount.textContent) || 0;
@@ -625,7 +626,7 @@ window.toggleFollow = async (targetUserId) => {
         // Different text logic based on context, but generally:
         if (btn.closest('.user-card')) {
             btn.textContent = isFollowing ? 'フォロー中' : 'フォロー';
-            btn.className = `btn btn-sm ${isFollowing ? 'btn-outline' : 'btn-primary'}`;
+            btn.className = 'btn btn-sm btn-primary';
         }
     });
 
@@ -683,14 +684,15 @@ window.toggleBlock = async (targetUserId) => {
         const isFollowing = currentUser.following && currentUser.following.includes(targetUserId);
         if (isBlocked) {
             elements.modalActionBtn.textContent = 'フォロー不可';
-            elements.modalActionBtn.className = 'btn btn-primary';
+            elements.modalActionBtn.className = 'btn btn-disabled-white';
         } else {
             elements.modalActionBtn.textContent = isFollowing ? 'フォロー中' : 'フォローする';
-            elements.modalActionBtn.className = isFollowing ? 'btn btn-outline' : 'btn btn-primary';
+            elements.modalActionBtn.className = 'btn btn-primary';
         }
 
         elements.modalThanksBtn.disabled = !isFollowing;
-        elements.modalThanksBtn.style.opacity = isFollowing ? '1' : '0.5';
+        elements.modalThanksBtn.className = isFollowing ? 'btn btn-success' : 'btn btn-disabled-white';
+        elements.modalThanksBtn.style.opacity = '1';
     }
 
     // 2. Refresh Lists (Blocked list, etc)
@@ -769,13 +771,13 @@ function renderUserCard(user, type = 'following') {
     let actionBtn = '';
     if (!isMe) {
         if (type === 'search') {
-            actionBtn = `<button class="btn btn-sm ${isFollowing ? 'btn-outline' : 'btn-primary'}" onclick="window.toggleFollow('${user.userId}')">
+            actionBtn = `<button class="btn btn-sm btn-primary" onclick="window.toggleFollow('${user.userId}')">
                 ${isFollowing ? 'フォロー中' : 'フォロー'}
             </button>`;
         } else if (type === 'blocked') {
             actionBtn = `<button class="btn btn-sm btn-outline" onclick="window.toggleBlock('${user.userId}')">解除</button>`;
         } else { // following / follower
-            actionBtn = `<button class="btn btn-sm ${isFollowing ? 'btn-outline' : 'btn-primary'}" onclick="window.toggleFollow('${user.userId}')">
+            actionBtn = `<button class="btn btn-sm btn-primary" onclick="window.toggleFollow('${user.userId}')">
                 ${isFollowing ? 'フォロー中' : 'フォロー'}
             </button>`;
         }
@@ -1146,22 +1148,23 @@ function renderProfileModal(user) {
         // Follow Button Logic
         if (isBlocked) {
             elements.modalActionBtn.textContent = 'フォロー不可';
-            elements.modalActionBtn.className = 'btn btn-primary';
+            elements.modalActionBtn.className = 'btn btn-disabled-white profile-action-btn';
         } else {
             elements.modalActionBtn.textContent = isFollowing ? 'フォロー中' : 'フォローする';
-            elements.modalActionBtn.className = isFollowing ? 'btn btn-outline' : 'btn btn-primary';
+            elements.modalActionBtn.className = 'btn btn-primary profile-action-btn';
         }
         elements.modalActionBtn.onclick = () => window.toggleFollow(user.userId);
         elements.modalActionBtn.classList.remove('hidden');
 
         // Disable Follow button if blocked
         elements.modalActionBtn.disabled = isBlocked;
-        elements.modalActionBtn.style.opacity = isBlocked ? '0.5' : '1';
+        elements.modalActionBtn.style.opacity = '1';
 
         // Thanks Button Logic
         elements.modalThanksBtn.classList.remove('hidden');
         elements.modalThanksBtn.disabled = !isFollowing; // Disable if not following
-        elements.modalThanksBtn.style.opacity = isFollowing ? '1' : '0.5';
+        elements.modalThanksBtn.className = isFollowing ? 'btn btn-success profile-action-btn' : 'btn btn-disabled-white profile-action-btn';
+        elements.modalThanksBtn.style.opacity = '1';
         elements.modalThanksBtn.onclick = () => {
             if (!elements.modalThanksBtn.disabled) {
                 elements.profileModal.classList.remove('show');
@@ -1173,7 +1176,7 @@ function renderProfileModal(user) {
 
         // Block Button Logic
         elements.modalBlockBtn.textContent = isBlocked ? 'ブロック中' : 'ブロック';
-        elements.modalBlockBtn.className = isBlocked ? 'btn btn-blocking' : 'btn btn-danger';
+        elements.modalBlockBtn.className = isBlocked ? 'btn btn-blocking profile-action-btn' : 'btn btn-danger profile-action-btn';
         elements.modalBlockBtn.onclick = () => window.toggleBlock(user.userId);
         elements.modalBlockBtn.classList.remove('hidden');
 

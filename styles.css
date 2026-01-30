@@ -411,6 +411,19 @@ body::after {
     background: var(--gray-400);
 }
 
+.btn-disabled-white {
+    background: white;
+    border: 1px solid var(--gray-300);
+    color: var(--gray-400);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.btn-disabled-white:hover {
+    transform: none;
+    box-shadow: none;
+}
+
 /* ============================
    ヘッダー
    ============================ */
@@ -1305,6 +1318,16 @@ body::after {
     resize: vertical;
     font-family: inherit;
     font-size: 1rem;
+}
+
+/* Profile Action Buttons Unified Style */
+.profile-action-btn {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 140px;
+    /* Ensure decent width */
 }
 
 .profile-body {
