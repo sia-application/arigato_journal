@@ -384,22 +384,20 @@ function updateAllBadges(messagesInput) {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
 
-    // Received Unread
-    const blocked = currentUser.blocked || [];
+    // Received Unread (Root messages only)
     const receivedUnread = messages.filter(m =>
         m.toId === currentUser.userId &&
         !m.isRead &&
+        !m.rootId &&
         !blocked.includes(m.fromId)
     ).length;
     updateReceivedBadge(receivedUnread);
 
-    // Sent Unread (replies from others)
+    // Sent Unread (Replies to me)
     const sentUnread = messages.filter(m =>
-        m.toId === currentUser.userId && // sent TO me
+        m.toId === currentUser.userId &&
         !m.isRead &&
-        m.rootId && // is a reply
-        // Check if the thread was started by me (simplified: assume replies to me are relevant)
-        // Original logic was deeper, keeping it simple for now.
+        m.rootId &&
         !blocked.includes(m.fromId)
     ).length;
     updateSentBadge(sentUnread);
@@ -525,7 +523,7 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
             </div>
 
             <div class="message-body">
-                ${msg.replyTo ? `
+                ${(msg.replyTo && type !== 'sent' && type !== 'received') ? `
                     <div class="reply-context">
                         <span class="reply-link-name">${escapeHtml(msg.replyTo.name)}さんへの返信</span>
                         "${escapeHtml(msg.replyTo.text)}"
@@ -953,16 +951,25 @@ function renderReceivedMessages() {
 
     const messages = cachedMessages.filter(m =>
         m.toId === currentUser.userId &&
-        !blocked.includes(m.fromId)
+        !blocked.includes(m.fromId) &&
+        !m.rootId
     );
 
     const senders = {};
     messages.forEach(msg => {
         if (!senders[msg.fromId]) {
+            // Find the ABSOLUTE latest activity in any thread with this partner
+            const allPartnerMessages = cachedMessages.filter(m =>
+                (m.fromId === currentUser.userId && m.toId === msg.fromId) ||
+                (m.toId === currentUser.userId && m.fromId === msg.fromId)
+            );
+            const absoluteLatest = allPartnerMessages.reduce((max, m) => Math.max(max, m.createdAt), 0);
+
             senders[msg.fromId] = {
                 id: msg.fromId,
                 name: msg.fromName,
                 lastMessage: msg,
+                absoluteLatest: absoluteLatest,
                 count: 0,
                 unread: 0
             };
@@ -980,7 +987,7 @@ function renderReceivedMessages() {
     elements.receivedMessagesDetail.classList.add('hidden');
     listContainer.classList.remove('hidden');
 
-    const sortedSenders = Object.values(senders).sort((a, b) => b.lastMessage.createdAt - a.lastMessage.createdAt);
+    const sortedSenders = Object.values(senders).sort((a, b) => b.absoluteLatest - a.absoluteLatest);
 
     if (sortedSenders.length === 0) {
         listContainer.innerHTML = '<div class="empty-state"><span class="empty-icon">📭</span><p>まだありがとうのメッセージはありません</p></div>';
@@ -1000,7 +1007,7 @@ function renderReceivedMessages() {
                 </span>
                 <div style="display:flex; align-items:center; gap:8px;">
                      ${sender.unread > 0 ? '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.8em;">New</span>' : ''}
-                     <span style="font-size:0.8em; color:var(--text-light);">${formatDate(sender.lastMessage.createdAt)}</span>
+                     <span style="font-size:0.8em; color:var(--text-light);">最新: ${formatDate(sender.absoluteLatest)}</span>
                 </div>
             </div>
              <div class="message-body" style="margin-top:8px;">
@@ -1020,9 +1027,9 @@ window.showReceivedDetail = (senderId) => {
     // Mark as read
     markMessagesAsRead(currentUser.userId, senderId, false);
 
-    // Show ONLY messages I received from this sender
+    // Show ONLY messages I received from this sender (Root messages only)
     const messages = cachedMessages.filter(m =>
-        m.toId === currentUser.userId && m.fromId === senderId
+        m.toId === currentUser.userId && m.fromId === senderId && !m.rootId
     ).sort((a, b) => b.createdAt - a.createdAt);
 
     if (messages.length === 0) {
@@ -1031,12 +1038,22 @@ window.showReceivedDetail = (senderId) => {
         return;
     }
 
+    // Calculate Latest Dates including replies across all cached messages
+    const threadLatest = {};
+    cachedMessages.forEach(m => {
+        const rootId = m.rootId || m.id;
+        if (!threadLatest[rootId] || m.createdAt > threadLatest[rootId]) {
+            threadLatest[rootId] = m.createdAt;
+        }
+    });
+
     elements.receivedSendersList.classList.add('hidden');
     elements.receivedMessagesDetail.classList.remove('hidden');
     elements.detailSenderName.textContent = messages[0].fromName; // Use latest name
 
     elements.detailMessagesList.innerHTML = messages.map(msg => {
-        return createMessageCard(msg, 'received');
+        const latestAt = threadLatest[msg.rootId || msg.id] || msg.createdAt;
+        return createMessageCard(msg, 'received', latestAt);
     }).join('');
 }
 
@@ -1052,16 +1069,25 @@ function renderSentMessages() {
     if (!currentUser) return;
     // Sent messages logic...
     const messages = cachedMessages.filter(m =>
-        m.fromId === currentUser.userId
+        m.fromId === currentUser.userId &&
+        !m.rootId
     );
 
     const recipients = {};
     messages.forEach(msg => {
         if (!recipients[msg.toId]) {
+            // Find the ABSOLUTE latest activity in any thread with this partner
+            const allPartnerMessages = cachedMessages.filter(m =>
+                (m.fromId === currentUser.userId && m.toId === msg.toId) ||
+                (m.toId === currentUser.userId && m.fromId === msg.toId)
+            );
+            const absoluteLatest = allPartnerMessages.reduce((max, m) => Math.max(max, m.createdAt), 0);
+
             recipients[msg.toId] = {
                 id: msg.toId,
                 name: msg.toName, // Snapshot name
                 lastMessage: msg,
+                absoluteLatest: absoluteLatest,
                 count: 0
             };
         }
@@ -1076,7 +1102,7 @@ function renderSentMessages() {
     elements.sentMessagesDetail.classList.add('hidden');
     listContainer.classList.remove('hidden');
 
-    const sortedRecipients = Object.values(recipients).sort((a, b) => b.lastMessage.createdAt - a.lastMessage.createdAt);
+    const sortedRecipients = Object.values(recipients).sort((a, b) => b.absoluteLatest - a.absoluteLatest);
 
     if (sortedRecipients.length === 0) {
         listContainer.innerHTML = '<div class="empty-state"><span class="empty-icon">✨</span><p>まだありがとうを送っていません</p></div>';
@@ -1093,7 +1119,7 @@ function renderSentMessages() {
                 <span class="message-to" style="font-weight:bold; font-size:1.1em; cursor:pointer;" onclick="event.stopPropagation(); window.showUserProfile('${pf.id}')">
                     ${escapeHtml(pf.name)}
                 </span>
-                 <span style="font-size:0.8em; color:var(--text-light);">${formatDate(pf.lastMessage.createdAt)}</span>
+                 <span style="font-size:0.8em; color:var(--text-light);">最新: ${formatDate(pf.absoluteLatest)}</span>
             </div>
              <div class="message-body" style="margin-top:8px;">
                 <div class="message-text" style="color:var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
@@ -1109,9 +1135,9 @@ window.showSentDetail = (recipientId) => {
     currentSentPartnerId = recipientId;
     const currentUser = getCurrentUser();
 
-    // Show ONLY messages I sent to this recipient
+    // Show ONLY messages I sent to this recipient (Root messages only)
     const messages = cachedMessages.filter(m =>
-        m.fromId === currentUser.userId && m.toId === recipientId
+        m.fromId === currentUser.userId && m.toId === recipientId && !m.rootId
     ).sort((a, b) => b.createdAt - a.createdAt);
 
     if (messages.length === 0) {
@@ -1124,8 +1150,18 @@ window.showSentDetail = (recipientId) => {
     elements.sentMessagesDetail.classList.remove('hidden');
     elements.detailRecipientName.textContent = messages[0].toName;
 
+    // Calculate Latest Dates including replies
+    const threadLatest = {};
+    cachedMessages.forEach(m => {
+        const rootId = m.rootId || m.id;
+        if (!threadLatest[rootId] || m.createdAt > threadLatest[rootId]) {
+            threadLatest[rootId] = m.createdAt;
+        }
+    });
+
     elements.detailSentMessagesList.innerHTML = messages.map(msg => {
-        return createMessageCard(msg, 'sent');
+        const latestAt = threadLatest[msg.rootId || msg.id] || msg.createdAt;
+        return createMessageCard(msg, 'sent', latestAt);
     }).join('');
 };
 
