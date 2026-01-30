@@ -787,6 +787,28 @@ body::after {
     border-color: var(--pink-400);
 }
 
+.new-badge-inline {
+    background-color: var(--pink-500);
+    color: white !important;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-left: 6px;
+    display: inline-block;
+    vertical-align: middle;
+    line-height: normal;
+    white-space: nowrap;
+    position: static !important;
+}
+
+/* Force buttons to be visible even without hover */
+.message-card .reply-btn,
+.message-card .delete-btn {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
 .reply-context {
     border-left: 3px solid var(--pink-300);
     background: rgba(255, 255, 255, 0.5);

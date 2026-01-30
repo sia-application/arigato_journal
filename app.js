@@ -521,8 +521,8 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
 
     // New badge for session-unread
     const sessionNewBadge = sessionUnreadMessages.has(msg.id) ?
-        '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.75em; margin-left:4px;">New</span>' : '';
-    const threadBtnWithBadge = `<span style="display:inline-flex; align-items:center;">${threadBtn}${sessionNewBadge}</span>`;
+        '<span class="new-badge-inline">New</span>' : '';
+    const threadBtnWithBadge = `<div style="display:inline-flex; align-items:center;">${threadBtn}${sessionNewBadge}</div>`;
 
     if (type === 'timeline') {
         userDisplay = `
