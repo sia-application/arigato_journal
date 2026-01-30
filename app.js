@@ -168,33 +168,44 @@ async function deleteMessage(messageId) {
 }
 
 // Mark as Read
-async function markMessagesAsRead(userId, partnerId, isSentHistory) {
-    // This requires a query to find unread messages
-    // It's complex to update header count instantly for specific user pairs without a batch update.
-
-    // Query: toId == userId AND fromId == partnerId AND isRead == false
-    const q = query(
-        collection(db, "messages"),
+async function markMessagesAsRead(userId, partnerId, options = {}) {
+    const qConstraints = [
         where("toId", "==", userId),
-        where("fromId", "==", partnerId),
         where("isRead", "==", false)
-    );
+    ];
 
-    const querySnapshot = await getDocs(q);
+    if (options.rootId) {
+        // Mark specific thread as read
+        const threadMessagesQuery = query(
+            collection(db, "messages"),
+            ...qConstraints,
+            where("rootId", "==", options.rootId)
+        );
+        const threadSnapshot = await getDocs(threadMessagesQuery);
+        threadSnapshot.forEach(async (document) => {
+            await updateDoc(doc(db, "messages", document.id), { isRead: true });
+        });
 
-    // Batch update logic would be ideal, but for now loop is easy to write
-    querySnapshot.forEach(async (document) => {
-        // Apply logic for thread/history context from previous version if needed
-        const data = document.data();
-
-        // Logic from previous app.js:
-        // if (isSentHistory === threadStartedByMe) ...
-        // Complex to reproduce 1:1 without fetching parents.
-        // Simplification: Mark all as read if we open the thread/history.
-
-        const docRef = doc(db, "messages", document.id);
-        await updateDoc(docRef, { isRead: true });
-    });
+        // Also check root message
+        const rootDoc = await getDoc(doc(db, "messages", options.rootId));
+        if (rootDoc.exists()) {
+            const data = rootDoc.data();
+            if (data.toId === userId && !data.isRead) {
+                await updateDoc(doc(db, "messages", options.rootId), { isRead: true });
+            }
+        }
+    } else if (partnerId) {
+        // Mark all from partner as read
+        const partnerQuery = query(
+            collection(db, "messages"),
+            ...qConstraints,
+            where("fromId", "==", partnerId)
+        );
+        const partnerSnapshot = await getDocs(partnerQuery);
+        partnerSnapshot.forEach(async (document) => {
+            await updateDoc(doc(db, "messages", document.id), { isRead: true });
+        });
+    }
 }
 
 
@@ -843,6 +854,9 @@ window.openThread = (msgId) => {
     currentThreadContext = { rootId, otherUserId: otherId, otherUserName: otherName };
     renderThreadMessages();
 
+    // Mark messages in this thread as read
+    markMessagesAsRead(currentUser.userId, null, { rootId });
+
     const modal = document.getElementById('thread-modal');
     modal.classList.remove('hidden');
     void modal.offsetWidth;
@@ -1027,7 +1041,7 @@ window.showReceivedDetail = (senderId) => {
     const currentUser = getCurrentUser();
 
     // Mark as read
-    markMessagesAsRead(currentUser.userId, senderId, false);
+    markMessagesAsRead(currentUser.userId, senderId);
 
     // Show ONLY messages I received from this sender (Root messages only)
     const messages = cachedMessages.filter(m =>
@@ -1136,6 +1150,9 @@ function renderSentMessages() {
 window.showSentDetail = (recipientId) => {
     currentSentPartnerId = recipientId;
     const currentUser = getCurrentUser();
+
+    // Mark as read (Unread replies in this thread)
+    markMessagesAsRead(currentUser.userId, recipientId);
 
     // Show ONLY messages I sent to this recipient (Root messages only)
     const messages = cachedMessages.filter(m =>
