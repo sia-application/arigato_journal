@@ -1,6 +1,6 @@
 // Firebase messaging logic moved to firebase-messaging-sw.js
 
-const CACHE_NAME = 'arigato-journal-v20';
+const CACHE_NAME = 'arigato-journal-v21';
 const ASSETS = [
     './',
     './index.html',

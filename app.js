@@ -1782,6 +1782,18 @@ function initialize() {
         localStorage.setItem('arigato_last_viewed_history', Date.now().toString());
     }
 
+    // Force badge update when returning to foreground
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            console.log('App became visible, updating badges...');
+            updateAllBadges();
+            // Also refresh user data in case of background updates
+            refreshCurrentUser().then(() => {
+                // Optional: trigger re-render if needed, but updateAllBadges is key
+            });
+        }
+    });
+
     // Register Service Worker for Notifications/PWA
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js', { type: 'module' })
