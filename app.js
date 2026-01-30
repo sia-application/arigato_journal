@@ -851,7 +851,7 @@ function renderSentMessages() {
 
     sortedRecipients.forEach(pf => {
         const div = document.createElement('div');
-        div.className = 'message-card';
+        div.className = 'message-card own-message';
         div.style.cursor = 'pointer';
         div.onclick = () => showSentDetail(pf.id);
         div.innerHTML = `
