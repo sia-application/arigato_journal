@@ -67,6 +67,23 @@
     .mobile-break {
         display: block;
     }
+
+    /* ユーザーカードのモバイル対応 */
+    .user-card {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        padding: 12px !important;
+    }
+
+    .user-card-actions {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 8px !important;
+        margin-top: 8px !important;
+        padding-top: 8px !important;
+        border-top: 1px solid var(--pink-100) !important;
+    }
 }
 
 *,
@@ -1034,6 +1051,9 @@ body::after {
     padding: 16px;
     margin-bottom: 12px;
     transition: var(--transition-normal);
+    gap: 12px;
+    flex-wrap: wrap;
+    /* Allow wrapping */
 }
 
 .user-card:hover {
@@ -1044,6 +1064,8 @@ body::after {
 .user-info {
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    /* Prevent overflow of long names */
 }
 
 .user-name {

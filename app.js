@@ -984,7 +984,7 @@ function renderUserCard(user, type = 'following') {
                     <div class="user-id">@${user.userId}</div>
                 </div>
             </div>
-            <div class="user-card-actions" style="display:flex; align-items:center; gap:4px;">
+            <div class="user-card-actions">
                 ${thanksBtn}
                 ${actionBtn}
             </div>
@@ -1627,6 +1627,7 @@ function switchTab(tabName) {
         renderFollowerList();
         renderBlockedList();
     }
+    updateAllBadges();
 }
 function handleTabClick(e) {
     const tabBtn = e.target.closest('.tab-btn');
