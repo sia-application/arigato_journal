@@ -182,9 +182,9 @@ async function markMessagesAsRead(userId, partnerId, options = {}) {
             where("rootId", "==", options.rootId)
         );
         const threadSnapshot = await getDocs(threadMessagesQuery);
-        threadSnapshot.forEach(async (document) => {
-            await updateDoc(doc(db, "messages", document.id), { isRead: true });
-        });
+        for (const docSnap of threadSnapshot.docs) {
+            await updateDoc(doc(db, "messages", docSnap.id), { isRead: true });
+        }
 
         // Also check root message
         const rootDoc = await getDoc(doc(db, "messages", options.rootId));
@@ -194,17 +194,27 @@ async function markMessagesAsRead(userId, partnerId, options = {}) {
                 await updateDoc(doc(db, "messages", options.rootId), { isRead: true });
             }
         }
-    } else if (partnerId) {
-        // Mark all from partner as read
-        const partnerQuery = query(
-            collection(db, "messages"),
-            ...qConstraints,
-            where("fromId", "==", partnerId)
-        );
-        const partnerSnapshot = await getDocs(partnerQuery);
-        partnerSnapshot.forEach(async (document) => {
-            await updateDoc(doc(db, "messages", document.id), { isRead: true });
+    } else if (partnerId && options.type) {
+        // Mark only messages belonging to this history type as read
+        // Filter locally from cachedMessages to find IDs
+        const toMark = cachedMessages.filter(m => {
+            if (m.toId !== userId || m.fromId !== partnerId || m.isRead) return false;
+
+            if (options.type === 'received') {
+                if (!m.rootId) return true; // Root is definitely received
+                const root = cachedMessages.find(r => r.id === m.rootId);
+                return root && root.toId === userId; // Started by others
+            } else if (options.type === 'sent') {
+                if (!m.rootId) return false; // Root started by me is NOT Received history (wait, Sent history detail shows root messages I sent)
+                const root = cachedMessages.find(r => r.id === m.rootId);
+                return root && root.fromId === userId; // Started by me
+            }
+            return false;
         });
+
+        for (const m of toMark) {
+            await updateDoc(doc(db, "messages", m.id), { isRead: true });
+        }
     }
 }
 
@@ -396,23 +406,35 @@ function updateAllBadges(messagesInput) {
     if (!currentUser) return;
 
     const blocked = currentUser.blocked || [];
+    let receivedUnread = 0;
+    let sentUnread = 0;
 
-    // Received Unread (Root messages only)
-    const receivedUnread = messages.filter(m =>
-        m.toId === currentUser.userId &&
-        !m.isRead &&
-        !m.rootId &&
-        !blocked.includes(m.fromId)
-    ).length;
+    messages.forEach(m => {
+        // Only count unread messages sent TO the current user from non-blocked users
+        if (m.toId === currentUser.userId && !m.isRead && !blocked.includes(m.fromId)) {
+            if (!m.rootId) {
+                // New Root Message (Someone sent me a Thank You) -> Received History
+                receivedUnread++;
+            } else {
+                // It's a reply. We need to check who started the thread.
+                const rootMsg = cachedMessages.find(root => root.id === m.rootId);
+                if (rootMsg) {
+                    if (rootMsg.fromId === currentUser.userId) {
+                        // I started this thread -> Sent History
+                        sentUnread++;
+                    } else if (rootMsg.toId === currentUser.userId) {
+                        // Someone else started this thread to thank me -> Received History
+                        receivedUnread++;
+                    }
+                } else {
+                    // Fallback: If root message not found, default to Received
+                    receivedUnread++;
+                }
+            }
+        }
+    });
+
     updateReceivedBadge(receivedUnread);
-
-    // Sent Unread (Replies to me)
-    const sentUnread = messages.filter(m =>
-        m.toId === currentUser.userId &&
-        !m.isRead &&
-        m.rootId &&
-        !blocked.includes(m.fromId)
-    ).length;
     updateSentBadge(sentUnread);
 }
 
@@ -507,9 +529,9 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
             </div>
         `;
     } else if (type === 'received') {
-        userDisplay = `<div class="message-users"><span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>${threadBtn}${deleteBtn}</div>`;
+        userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>${(msg.isRead === false && msg.toId === currentUser.userId) ? '<span class="unread-dot"></span>' : ''}${threadBtn}${deleteBtn}</div>`;
     } else if (type === 'sent') {
-        userDisplay = `<div class="message-users"><span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span>${threadBtn}${deleteBtn}</div>`;
+        userDisplay = `<div class="message-users" style="display:flex; align-items:center; gap:8px;"><span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span>${(msg.isRead === false && msg.toId === currentUser.userId) ? '<span class="unread-dot"></span>' : ''}${threadBtn}${deleteBtn}</div>`;
     } else if (type === 'thread') {
         userDisplay = `
             <div class="message-users">
@@ -529,9 +551,11 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
             <div class="message-header">
                 ${userDisplay}
                 ${type !== 'thread' ? `
-                <div class="message-meta" style="font-size: 0.8em; color: var(--text-secondary); display:flex; align-items:center;">
-                    ${(msg.isRead === false && msg.toId === currentUser.userId) ? '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.8em; margin-right:6px;">New</span>' : ''}
-                    ${timeLabel}${formatDate(timeToUse)}
+                <div class="message-meta" style="font-size: 0.8em; color: var(--text-secondary); display:flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                    <div>${timeLabel}${formatDate(timeToUse)}</div>
+                    ${(msg.isRead === false && msg.toId === currentUser.userId) ?
+                (type === 'received' || type === 'sent' ? '<span class="unread-dot"></span>' : '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.8em;">New</span>')
+                : ''}
                 </div>` : ''}
             </div>
 
@@ -1018,11 +1042,13 @@ function renderReceivedMessages() {
 
         div.innerHTML = `
             <div class="message-header">
-                <span class="message-from" style="font-weight:bold; font-size:1.1em; cursor:pointer;" onclick="event.stopPropagation(); window.showUserProfile('${sender.id}')">
-                    ${escapeHtml(sender.name)}
-                </span>
                 <div style="display:flex; align-items:center; gap:8px;">
-                     ${sender.unread > 0 ? '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.8em;">New</span>' : ''}
+                    <span class="message-from" style="font-weight:bold; font-size:1.1em; cursor:pointer;" onclick="event.stopPropagation(); window.showUserProfile('${sender.id}')">
+                        ${escapeHtml(sender.name)}
+                    </span>
+                    ${sender.unread > 0 ? '<span class="unread-dot"></span>' : ''}
+                </div>
+                <div style="display:flex; align-items:center;">
                      <span style="font-size:0.8em; color:var(--text-light);">最新: ${formatDate(sender.absoluteLatest)}</span>
                 </div>
             </div>
@@ -1040,8 +1066,8 @@ window.showReceivedDetail = (senderId) => {
     currentReceivedPartnerId = senderId;
     const currentUser = getCurrentUser();
 
-    // Mark as read
-    markMessagesAsRead(currentUser.userId, senderId);
+    // Mark as read (Only received messages/replies)
+    markMessagesAsRead(currentUser.userId, senderId, { type: 'received' });
 
     // 1. Calculate Latest Dates including replies across all cached messages first
     const threadLatest = {};
@@ -1099,11 +1125,15 @@ function renderSentMessages() {
             );
             const absoluteLatest = allPartnerMessages.reduce((max, m) => Math.max(max, m.createdAt), 0);
 
+            // Count unread replies (messages sent TO me from this partner)
+            const unreadCount = allPartnerMessages.filter(m => m.toId === currentUser.userId && !m.isRead).length;
+
             recipients[msg.toId] = {
                 id: msg.toId,
                 name: msg.toName, // Snapshot name
                 lastMessage: msg,
                 absoluteLatest: absoluteLatest,
+                unread: unreadCount,
                 count: 0
             };
         }
@@ -1132,9 +1162,12 @@ function renderSentMessages() {
         div.onclick = () => showSentDetail(pf.id);
         div.innerHTML = `
              <div class="message-header">
-                <span class="message-to" style="font-weight:bold; font-size:1.1em; cursor:pointer;" onclick="event.stopPropagation(); window.showUserProfile('${pf.id}')">
-                    ${escapeHtml(pf.name)}
-                </span>
+                 <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="message-to" style="font-weight:bold; font-size:1.1em; cursor:pointer;" onclick="event.stopPropagation(); window.showUserProfile('${pf.id}')">
+                        ${escapeHtml(pf.name)}
+                    </span>
+                    ${pf.unread > 0 ? '<span class="unread-dot"></span>' : ''}
+                 </div>
                  <span style="font-size:0.8em; color:var(--text-light);">最新: ${formatDate(pf.absoluteLatest)}</span>
             </div>
              <div class="message-body" style="margin-top:8px;">
@@ -1151,8 +1184,8 @@ window.showSentDetail = (recipientId) => {
     currentSentPartnerId = recipientId;
     const currentUser = getCurrentUser();
 
-    // Mark as read (Unread replies in this thread)
-    markMessagesAsRead(currentUser.userId, recipientId);
+    // Mark as read (Only unread replies in my sent threads)
+    markMessagesAsRead(currentUser.userId, recipientId, { type: 'sent' });
 
     // 1. Calculate Latest Dates including replies first
     const threadLatest = {};

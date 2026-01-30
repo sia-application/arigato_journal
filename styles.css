@@ -573,6 +573,15 @@ body::after {
     display: none;
 }
 
+.unread-dot {
+    width: 10px;
+    height: 10px;
+    background-color: #1d9bf0;
+    /* X blue */
+    border-radius: 50%;
+    display: inline-block;
+}
+
 /* ============================
    タブコンテンツ
    ============================ */
