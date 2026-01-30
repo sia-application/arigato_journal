@@ -18,9 +18,10 @@ import {
     doc,
     updateDoc,
     arrayUnion,
-    arrayRemove,
     deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+import { messaging } from './firebase-config.js';
 
 // ============================
 // データ管理 (Firestore)
@@ -428,6 +429,14 @@ function setupListeners() {
             }
         });
     });
+
+    // Handle Foreground Messages
+    onMessage(messaging, (payload) => {
+        console.log('Message received. ', payload);
+        const { title, body } = payload.notification;
+        // Show Toast
+        showToast(`🔔 ${title}: ${body}`);
+    });
 }
 
 
@@ -499,18 +508,41 @@ function checkNotificationPermission() {
 }
 
 async function requestNotificationPermission() {
-    if (!('Notification' in window)) return;
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            console.log('Notification permission granted.');
+            elements.notificationBanner.classList.add('hidden');
 
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-        showToast("通知が有効になりました");
-        if (elements.notificationBanner) elements.notificationBanner.classList.add('hidden');
+            // Get FCM Token
+            // VAPID Key: Replace with your actual key from Firebase Console
+            const vapidKey = 'YOUR_VAPID_KEY';
 
-        // Test notification
-        triggerNotification("Arigato Journal", "通知設定が完了しました！");
-    } else if (permission === 'denied') {
-        showToast("通知が拒否されました。ブラウザの設定から変更できます。");
-        if (elements.notificationBanner) elements.notificationBanner.classList.add('hidden');
+            try {
+                const token = await getToken(messaging, { vapidKey: vapidKey });
+                if (token) {
+                    console.log('FCM Token:', token);
+                    // Save to Firestore
+                    const currentUser = getCurrentUser();
+                    if (currentUser) {
+                        const userRef = doc(db, "users", currentUser.userId);
+                        await updateDoc(userRef, { fcmToken: token });
+                    }
+                } else {
+                    console.log('No registration token available. Request permission to generate one.');
+                }
+            } catch (tokenErr) {
+                console.log('Error retrieving token: ', tokenErr);
+                // Proceed without token if VAPID key is missing/invalid, just hide banner
+            }
+            // Test notification
+            triggerNotification("Arigato Journal", "通知設定が完了しました！");
+        } else if (permission === 'denied') {
+            showToast("通知が拒否されました。ブラウザの設定から変更できます。");
+            if (elements.notificationBanner) elements.notificationBanner.classList.add('hidden');
+        }
+    } catch (err) {
+        console.log('An error occurred while retrieving token. ', err);
     }
 }
 
@@ -1725,7 +1757,7 @@ function initialize() {
 
     // Register Service Worker for Notifications/PWA
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
+        navigator.serviceWorker.register('sw.js', { type: 'module' })
             .then(reg => console.log('Service Worker registered', reg))
             .catch(err => console.log('Service Worker registration failed', err));
     }

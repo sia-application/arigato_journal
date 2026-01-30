@@ -13,14 +13,17 @@ const firebaseConfig = {
 // Enable offline persistence with new API to silence deprecation warning
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+import { getMessaging } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+
 const app = initializeApp(firebaseConfig);
 const db = initializeFirestore(app, {
     localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager()
     })
 });
+const messaging = getMessaging(app);
 
 // Remove old deprecated call
 // enableIndexedDbPersistence(db)...
 
-export { db };
+export { db, messaging };
