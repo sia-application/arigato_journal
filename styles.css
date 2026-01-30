@@ -464,6 +464,7 @@ body::after {
     font-size: 14px;
     font-weight: 500;
     color: var(--pink-600);
+    cursor: pointer;
 }
 
 .user-badge::before {

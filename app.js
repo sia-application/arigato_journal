@@ -1203,6 +1203,21 @@ async function handleSaveProfile() {
             name: newName,
             bio: newBio
         });
+
+        // Update UI immediately (Important for immediate feedback)
+        elements.modalUsername.textContent = newName;
+        elements.bioDisplay.textContent = newBio || '自己紹介はまだありません';
+
+        // Update Local Storage Session
+        currentUser.name = newName;
+        currentUser.bio = newBio;
+        setCurrentUser(currentUser);
+
+        // Update Header Badge
+        if (elements.currentUserBadge) {
+            elements.currentUserBadge.textContent = newName;
+        }
+
         showToast('プロフィールを更新しました');
         toggleProfileEdit();
     } catch (err) {
