@@ -1640,6 +1640,8 @@ body::after {
 .btn-sm {
     padding: 6px 16px;
     font-size: 13px;
+    border-radius: 50px;
+    /* Pill shape */
 }
 
 /* Following Button Style (Default/List - Filled - Orange) */
