@@ -1052,10 +1052,14 @@ function renderUserCard(user, type = 'following') {
         }
     }
 
+    const avatarContent = (user.avatar && user.avatar.startsWith('data:image'))
+        ? `<div class="profile-avatar sm" style="background-image: url(${user.avatar}); background-size: cover; background-position: center;"></div>`
+        : `<div class="profile-avatar sm">${user.avatar || '👤'}</div>`;
+
     return `
         <div class="message-card user-card">
             <div class="user-card-content" onclick="window.showUserProfile('${user.userId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; flex:1;">
-                <div class="profile-avatar sm">${user.avatar || '👤'}</div>
+                ${avatarContent}
                 <div class="user-info">
                     <div class="user-name">
                         ${escapeHtml(user.name)}
@@ -1549,7 +1553,18 @@ function renderProfileModal(user) {
 
     elements.modalUsername.textContent = user.name;
     elements.modalUserid.textContent = `@${user.userId}`;
-    elements.profileAvatarDisplay.textContent = user.avatar || '👤';
+
+    // Avatar handling
+    elements.profileAvatarDisplay.style.backgroundImage = 'none';
+    if (user.avatar && user.avatar.startsWith('data:image')) {
+        elements.profileAvatarDisplay.textContent = '';
+        elements.profileAvatarDisplay.style.backgroundImage = `url(${user.avatar})`;
+        elements.profileAvatarDisplay.style.backgroundSize = 'cover';
+        elements.profileAvatarDisplay.style.backgroundPosition = 'center';
+    } else {
+        elements.profileAvatarDisplay.textContent = user.avatar || '👤';
+    }
+
     elements.bioDisplay.textContent = user.bio || '自己紹介はまだありません';
 
     // Stats
@@ -1867,6 +1882,11 @@ function toggleProfileEdit() {
     if (isEditing) {
         elements.bioEdit.value = elements.bioDisplay.textContent === '自己紹介はまだありません' ? '' : elements.bioDisplay.textContent;
         elements.usernameEdit.value = elements.modalUsername.textContent;
+        // Reset temp avatar state if cancelling?
+        // Ideally we revert preview if cancelled, but keeping it simple for now. 
+        // If they click cancel, next time they open modal it re-renders from saved data.
+    } else {
+        newAvatarBase64 = null; // Reset on close/save
     }
 }
 
@@ -1884,18 +1904,33 @@ async function handleSaveProfile() {
 
     try {
         const userRef = doc(db, "users", currentUser.userId);
-        await updateDoc(userRef, {
+        const updateData = {
             name: newName,
             bio: newBio
-        });
+        };
+
+        if (newAvatarBase64) {
+            updateData.avatar = newAvatarBase64;
+        }
+
+        await updateDoc(userRef, updateData);
 
         // Update UI immediately (Important for immediate feedback)
         elements.modalUsername.textContent = newName;
         elements.bioDisplay.textContent = newBio || '自己紹介はまだありません';
 
+        if (newAvatarBase64) {
+            // Preview is already set by handleAvatarUpload, but ensures logic
+            elements.profileAvatarDisplay.textContent = '';
+            elements.profileAvatarDisplay.style.backgroundImage = `url(${newAvatarBase64})`;
+            elements.profileAvatarDisplay.style.backgroundSize = 'cover';
+            elements.profileAvatarDisplay.style.backgroundPosition = 'center';
+        }
+
         // Update Local Storage Session
         currentUser.name = newName;
         currentUser.bio = newBio;
+        if (newAvatarBase64) currentUser.avatar = newAvatarBase64;
         setCurrentUser(currentUser);
 
         // Update Header Badge
@@ -1911,10 +1946,74 @@ async function handleSaveProfile() {
     }
 }
 
+// Temporary storage for new avatar
+let newAvatarBase64 = null;
+
 async function handleAvatarUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
-    showToast('画像のアップロード機能は現在Emoijのみ対応しています（将来的にStorageに対応予定）');
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        showToast('画像ファイルを選択してください');
+        return;
+    }
+
+    // Resize and Convert to Base64
+    try {
+        const base64 = await resizeImage(file, 300, 300); // Max 300x300
+        newAvatarBase64 = base64;
+
+        // Update Preview
+        elements.profileAvatarDisplay.textContent = '';
+        elements.profileAvatarDisplay.style.backgroundImage = `url(${base64})`;
+        elements.profileAvatarDisplay.style.backgroundSize = 'cover';
+        elements.profileAvatarDisplay.style.backgroundPosition = 'center';
+
+        // Hide edit overlay temporarily to show result
+        elements.avatarEditOverlay.classList.add('hidden');
+    } catch (err) {
+        console.error("Image processing failed:", err);
+        showToast('画像の処理に失敗しました');
+    }
+}
+
+function resizeImage(file, maxWidth, maxHeight) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width *= maxHeight / height;
+                        height = maxHeight;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Compress output
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.onerror = (err) => reject(err);
+        };
+        reader.onerror = (err) => reject(err);
+    });
 }
 
 async function handleThreadReply(e) {

@@ -10,16 +10,17 @@ const firebaseConfig = {
     appId: "1:262613462976:web:ee5824eece6a90e18e6225"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Enable offline persistence with new API to silence deprecation warning
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// Enable offline persistence
-enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code == 'failed-precondition') {
-        console.warn('Persistence failed-precondition');
-    } else if (err.code == 'unimplemented') {
-        console.warn('Persistence unimplemented');
-    }
+const app = initializeApp(firebaseConfig);
+const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+    })
 });
+
+// Remove old deprecated call
+// enableIndexedDbPersistence(db)...
 
 export { db };
