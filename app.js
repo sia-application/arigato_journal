@@ -764,22 +764,60 @@ function renderUserCard(user, type = 'following') {
     const currentUser = getCurrentUser();
     const isMe = user.userId === currentUser.userId;
     const isFollowing = currentUser.following && currentUser.following.includes(user.userId);
+    const isBlocked = currentUser.blocked && currentUser.blocked.includes(user.userId);
 
     // Check if they follow you
     const followsYou = user.following && user.following.includes(currentUser.userId);
 
     let actionBtn = '';
+    let thanksBtn = '';
+
     if (!isMe) {
-        if (type === 'search') {
-            actionBtn = `<button class="btn btn-sm btn-primary" onclick="window.toggleFollow('${user.userId}')">
+        // Shared Thanks Button Logic
+        const thanksClass = isFollowing ? 'btn btn-sm btn-success' : 'btn btn-sm btn-disabled-white';
+        const thanksDisabled = !isFollowing ? 'disabled' : '';
+        const thanksOpacity = isFollowing ? '1' : '1'; // btn-disabled-white handles look
+        // Actually btn-disabled-white sets color, but opacity might be needed if base btn styles interfere. 
+        // Let's rely on class.
+
+        thanksBtn = `<button class="${thanksClass}" 
+            style="margin-right: 4px;"
+            ${thanksDisabled}
+            onclick="event.stopPropagation(); window.openSendTab('${user.userId}')">
+            ありがとうを送る
+        </button>`;
+
+        if (isBlocked) {
+            // Blocked State (Priority over Search/Friends logic if blocked)
+            // User requested "Show Blocking" in follower list if blocked.
+            // Actually 'type' arg is used to distinguish context.
+            // But if I block someone, I usually want to see "Blocking" regardless of list type?
+            // "Blocked List" type specifically asks for "Unblock" (kaijo).
+            // "Follower List" type: if blocked, show "Blocking".
+
+            if (type === 'blocked') {
+                actionBtn = `<button class="btn btn-sm btn-outline" onclick="window.toggleBlock('${user.userId}')">解除</button>`;
+            } else {
+                // In Search or Following/Follower lists, if blocked, show "Blocking"
+                actionBtn = `<button class="btn btn-sm btn-blocking" onclick="window.toggleBlock('${user.userId}')">ブロック中</button>`;
+            }
+        } else {
+            // Not Blocked
+            actionBtn = `<button class="btn btn-sm ${isFollowing ? 'btn-primary' : 'btn-primary'}" onclick="window.toggleFollow('${user.userId}')">
                 ${isFollowing ? 'フォロー中' : 'フォロー'}
             </button>`;
-        } else if (type === 'blocked') {
-            actionBtn = `<button class="btn btn-sm btn-outline" onclick="window.toggleBlock('${user.userId}')">解除</button>`;
-        } else { // following / follower
-            actionBtn = `<button class="btn btn-sm btn-primary" onclick="window.toggleFollow('${user.userId}')">
-                ${isFollowing ? 'フォロー中' : 'フォロー'}
-            </button>`;
+            if (isFollowing) {
+                // If following, ensure btn-primary is used (already set above)
+                // Wait, "Follow" (not following) is also btn-primary per recent changes?
+                // Yes, user wanted "Following" -> btn-primary. "Follow" is also btn-primary usually?
+                // Let's check previous logic.
+                // Previous: btn.className = 'btn btn-sm btn-primary'; for both.
+            } else {
+                // Follow
+                actionBtn = `<button class="btn btn-sm btn-primary" onclick="window.toggleFollow('${user.userId}')">
+                    フォローする
+                </button>`;
+            }
         }
     }
 
@@ -795,10 +833,22 @@ function renderUserCard(user, type = 'following') {
                     <div class="user-id">@${user.userId}</div>
                 </div>
             </div>
-            ${actionBtn}
+            <div class="user-card-actions" style="display:flex; align-items:center; gap:4px;">
+                ${thanksBtn}
+                ${actionBtn}
+            </div>
         </div>
     `;
 }
+
+// Helper to open send tab with user selected
+window.openSendTab = (userId) => {
+    switchTab('send');
+    if (elements.recipientSelect) {
+        elements.recipientSelect.value = userId;
+        elements.recipientSelect.disabled = true; // Lock selection
+    }
+};
 
 function renderReceivedMessages() {
     const currentUser = getCurrentUser();
@@ -1093,7 +1143,7 @@ function updateRecipientSelect(friends) {
     friends.forEach(user => {
         const option = document.createElement('option');
         option.value = user.userId;
-        option.textContent = `${user.name} (@${user.userId})`;
+        option.textContent = user.name;
         option.dataset.name = user.name;
         elements.recipientSelect.appendChild(option);
     });
@@ -1170,7 +1220,10 @@ function renderProfileModal(user) {
                 elements.profileModal.classList.remove('show');
                 setTimeout(() => elements.profileModal.classList.add('hidden'), 300);
                 switchTab('send');
-                elements.recipientSelect.value = user.userId;
+                if (elements.recipientSelect) {
+                    elements.recipientSelect.value = user.userId;
+                    elements.recipientSelect.disabled = true; // Lock selection
+                }
             }
         };
 
@@ -1328,6 +1381,11 @@ function initialize() {
 function switchTab(tabName) {
     elements.tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
     elements.tabContents.forEach(content => content.classList.toggle('active', content.id === `tab-${tabName}`));
+
+    // Reset inputs when switching manually (or generically)
+    if (tabName === 'send') {
+        if (elements.recipientSelect) elements.recipientSelect.disabled = false;
+    }
 
     if (tabName === 'timeline') renderTimeline();
     else if (tabName === 'received') renderReceivedMessages();
