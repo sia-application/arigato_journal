@@ -951,18 +951,17 @@ function renderBlockedList() {
 }
 
 function renderSearchResult() {
-    const queryStr = elements.searchUserIdInput.value.trim().toLowerCase();
+    const queryStr = elements.searchUserIdInput.value.trim();
     const container = elements.searchResult;
     if (!queryStr) {
         container.innerHTML = '';
         return;
     }
-    const results = cachedUsers.filter(u =>
-        u.userId.toLowerCase().includes(queryStr) ||
-        u.name.toLowerCase().includes(queryStr)
-    );
+    // Strict match for User ID only
+    const results = cachedUsers.filter(u => u.userId === queryStr);
+
     if (results.length === 0) {
-        container.innerHTML = '<p style="text-align:center; padding:16px; color:var(--text-light);">見つかりませんでした</p>';
+        container.innerHTML = '<p style="text-align:center; padding:16px; color:var(--text-light);">ユーザーIDが完全に一致するユーザーは見つかりませんでした</p>';
     } else {
         container.innerHTML = results.map(u => renderUserCard(u, 'search')).join('');
     }
