@@ -433,9 +433,9 @@ function setupListeners() {
     // Handle Foreground Messages
     onMessage(messaging, (payload) => {
         console.log('Message received. ', payload);
-        const { title, body } = payload.notification;
-        // Show Toast
-        showToast(`🔔 ${title}: ${body}`);
+        // Foreground notification disabled by user request
+        // const { title, body } = payload.notification;
+        // showToast(`🔔 ${title}: ${body}`);
     });
 }
 
@@ -526,16 +526,12 @@ async function saveFcmToken() {
                 const userRef = doc(db, "users", currentUser.userId);
                 await updateDoc(userRef, { fcmToken: token });
                 console.log('FCM Token saved to Firestore');
-                showToast("通知設定をサーバーに保存しました ✅");
             }
         } else {
             console.log('No registration token available.');
         }
     } catch (tokenErr) {
         console.log('Error retrieving/saving token: ', tokenErr);
-        // Debugging: Show exact error on mobile
-        alert(`通知エラー: ${tokenErr.message}`);
-        showToast("通知設定の保存に失敗しました ❌");
     }
 }
 
