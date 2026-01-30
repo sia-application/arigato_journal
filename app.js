@@ -687,7 +687,8 @@ async function handleSendMessage(e) {
         elements.messageInput.value = '';
         elements.recipientSelect.value = '';
         cancelReply();
-        // UI updates automatically via listener
+        // Return to Friends tab after successful send
+        switchTab('friends');
     } catch (err) {
         console.error(err);
         showToast('送信に失敗しました');
