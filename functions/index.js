@@ -38,15 +38,6 @@ exports.sendNotificationOnMessage = functions.firestore
                 title: `ありがとうが届きました！`,
                 body: `${senderName}さん: ${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}`
             },
-            webpush: {
-                fcm_options: {
-                    link: 'https://arigato-journal.web.app/'
-                },
-                notification: {
-                    icon: '/assets/logo.png',
-                    badge: '/assets/logo.png'
-                }
-            },
             token: fcmToken
         };
 
