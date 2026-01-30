@@ -108,6 +108,15 @@ body {
     overflow-x: hidden;
 }
 
+/* フッター */
+.app-footer {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-light);
+    font-size: 12px;
+    width: 100%;
+}
+
 /* 背景デコレーション */
 body::before {
     content: '';
