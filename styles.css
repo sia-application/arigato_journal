@@ -401,6 +401,16 @@ body::after {
     transform: translateX(4px);
 }
 
+.btn-blocking {
+    background: var(--gray-500);
+    color: white;
+    box-shadow: none;
+}
+
+.btn-blocking:hover {
+    background: var(--gray-400);
+}
+
 /* ============================
    ヘッダー
    ============================ */
@@ -1307,6 +1317,10 @@ body::after {
     gap: 12px;
     flex-wrap: wrap;
     margin-top: 8px;
+}
+
+.profile-actions .btn {
+    border-radius: 50px;
 }
 
 /* ユーザー名のリンクスタイル */

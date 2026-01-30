@@ -607,8 +607,12 @@ window.toggleFollow = async (targetUserId) => {
 
     // 1. Update Profile Modal if Open
     if (elements.profileModal.classList.contains('show') && currentProfileUserId === targetUserId) {
-        elements.modalActionBtn.textContent = isFollowing ? 'フォロー解除' : 'フォローする';
+        elements.modalActionBtn.textContent = isFollowing ? 'フォロー中' : 'フォローする';
         elements.modalActionBtn.className = isFollowing ? 'btn btn-outline' : 'btn btn-primary';
+
+        // Update Thanks Button state
+        elements.modalThanksBtn.disabled = !isFollowing;
+        elements.modalThanksBtn.style.opacity = isFollowing ? '1' : '0.5';
 
         // Optimistically update follower count on the modal
         const currentCount = parseInt(elements.followerCount.textContent) || 0;
@@ -620,7 +624,7 @@ window.toggleFollow = async (targetUserId) => {
     btns.forEach(btn => {
         // Different text logic based on context, but generally:
         if (btn.closest('.user-card')) {
-            btn.textContent = isFollowing ? '解除' : 'フォロー';
+            btn.textContent = isFollowing ? 'フォロー中' : 'フォロー';
             btn.className = `btn btn-sm ${isFollowing ? 'btn-outline' : 'btn-primary'}`;
         }
     });
@@ -634,24 +638,67 @@ window.toggleFollow = async (targetUserId) => {
 };
 
 window.toggleBlock = async (targetUserId) => {
-    const currentUser = await refreshCurrentUser();
+    let currentUser = await refreshCurrentUser();
     if (!currentUser) return;
 
     if (!confirm('このユーザーをブロック/解除しますか？')) return;
 
     const userRef = doc(db, "users", currentUser.userId);
-    const blocked = currentUser.blocked || [];
+    let blocked = currentUser.blocked || [];
+    let isBlocked = blocked.includes(targetUserId);
 
-    if (blocked.includes(targetUserId)) {
+    if (isBlocked) {
         await updateDoc(userRef, {
             blocked: arrayRemove(targetUserId)
         });
         showToast('ブロックを解除しました');
+        isBlocked = false;
     } else {
-        await updateDoc(userRef, {
+        // Block and also Unfollow if following
+        const updates = {
             blocked: arrayUnion(targetUserId)
-        });
+        };
+
+        if (currentUser.following && currentUser.following.includes(targetUserId)) {
+            updates.following = arrayRemove(targetUserId);
+        }
+
+        await updateDoc(userRef, updates);
         showToast('ブロックしました');
+        isBlocked = true;
+    }
+
+    // Refresh
+    currentUser = await refreshCurrentUser();
+
+    // 1. Update Profile Modal if Open
+    if (elements.profileModal.classList.contains('show') && currentProfileUserId === targetUserId) {
+        elements.modalBlockBtn.textContent = isBlocked ? 'ブロック中' : 'ブロック';
+        elements.modalBlockBtn.className = isBlocked ? 'btn btn-blocking' : 'btn btn-danger';
+
+        // Disable Follow button if blocked
+        elements.modalActionBtn.disabled = isBlocked;
+        elements.modalActionBtn.style.opacity = isBlocked ? '0.5' : '1';
+
+        const isFollowing = currentUser.following && currentUser.following.includes(targetUserId);
+        if (isBlocked) {
+            elements.modalActionBtn.textContent = 'フォロー不可';
+            elements.modalActionBtn.className = 'btn btn-primary';
+        } else {
+            elements.modalActionBtn.textContent = isFollowing ? 'フォロー中' : 'フォローする';
+            elements.modalActionBtn.className = isFollowing ? 'btn btn-outline' : 'btn btn-primary';
+        }
+
+        elements.modalThanksBtn.disabled = !isFollowing;
+        elements.modalThanksBtn.style.opacity = isFollowing ? '1' : '0.5';
+    }
+
+    // 2. Refresh Lists (Blocked list, etc)
+    const activeTab = document.querySelector('.tab-btn.active');
+    if (activeTab && activeTab.dataset.tab === 'friends') {
+        renderBlockedList();
+        // If we blocked someone we were following, logic might imply unfollowing or hiding...
+        // For now just refresh displayed blocked list
     }
 };
 
@@ -723,12 +770,14 @@ function renderUserCard(user, type = 'following') {
     if (!isMe) {
         if (type === 'search') {
             actionBtn = `<button class="btn btn-sm ${isFollowing ? 'btn-outline' : 'btn-primary'}" onclick="window.toggleFollow('${user.userId}')">
-                ${isFollowing ? '解除' : 'フォロー'}
+                ${isFollowing ? 'フォロー中' : 'フォロー'}
             </button>`;
         } else if (type === 'blocked') {
             actionBtn = `<button class="btn btn-sm btn-outline" onclick="window.toggleBlock('${user.userId}')">解除</button>`;
         } else { // following / follower
-            actionBtn = `<button class="btn btn-sm btn-outline" onclick="window.toggleFollow('${user.userId}')">解除</button>`;
+            actionBtn = `<button class="btn btn-sm ${isFollowing ? 'btn-outline' : 'btn-primary'}" onclick="window.toggleFollow('${user.userId}')">
+                ${isFollowing ? 'フォロー中' : 'フォロー'}
+            </button>`;
         }
     }
 
@@ -1081,28 +1130,50 @@ function renderProfileModal(user) {
     elements.modalBlockBtn.classList.add('hidden');
     elements.modalThanksBtn.classList.add('hidden');
 
+    // Check following status for Thanks button disabling
+    const isFollowing = currentUser.following && currentUser.following.includes(user.userId);
+
     if (user.userId === currentUser.userId) {
         // Own Profile
         elements.modalEditBtn.classList.remove('hidden');
         elements.modalFollowsYouBadge.classList.add('hidden');
+        elements.modalThanksBtn.classList.add('hidden'); // Ensure hidden for self
     } else {
         // Other User
-        const isFollowing = currentUser.following && currentUser.following.includes(user.userId);
-        elements.modalActionBtn.textContent = isFollowing ? 'フォロー解除' : 'フォローする';
-        elements.modalActionBtn.className = isFollowing ? 'btn btn-outline' : 'btn btn-primary';
+        // const isFollowing = ... already calculated above
+        const isBlocked = currentUser.blocked && currentUser.blocked.includes(user.userId);
+
+        // Follow Button Logic
+        if (isBlocked) {
+            elements.modalActionBtn.textContent = 'フォロー不可';
+            elements.modalActionBtn.className = 'btn btn-primary';
+        } else {
+            elements.modalActionBtn.textContent = isFollowing ? 'フォロー中' : 'フォローする';
+            elements.modalActionBtn.className = isFollowing ? 'btn btn-outline' : 'btn btn-primary';
+        }
         elements.modalActionBtn.onclick = () => window.toggleFollow(user.userId);
         elements.modalActionBtn.classList.remove('hidden');
 
+        // Disable Follow button if blocked
+        elements.modalActionBtn.disabled = isBlocked;
+        elements.modalActionBtn.style.opacity = isBlocked ? '0.5' : '1';
+
+        // Thanks Button Logic
         elements.modalThanksBtn.classList.remove('hidden');
+        elements.modalThanksBtn.disabled = !isFollowing; // Disable if not following
+        elements.modalThanksBtn.style.opacity = isFollowing ? '1' : '0.5';
         elements.modalThanksBtn.onclick = () => {
-            elements.profileModal.classList.remove('show');
-            setTimeout(() => elements.profileModal.classList.add('hidden'), 300);
-            switchTab('send');
-            elements.recipientSelect.value = user.userId;
+            if (!elements.modalThanksBtn.disabled) {
+                elements.profileModal.classList.remove('show');
+                setTimeout(() => elements.profileModal.classList.add('hidden'), 300);
+                switchTab('send');
+                elements.recipientSelect.value = user.userId;
+            }
         };
 
-        const isBlocked = currentUser.blocked && currentUser.blocked.includes(user.userId);
-        elements.modalBlockBtn.textContent = isBlocked ? 'ブロック解除' : 'ブロック';
+        // Block Button Logic
+        elements.modalBlockBtn.textContent = isBlocked ? 'ブロック中' : 'ブロック';
+        elements.modalBlockBtn.className = isBlocked ? 'btn btn-blocking' : 'btn btn-danger';
         elements.modalBlockBtn.onclick = () => window.toggleBlock(user.userId);
         elements.modalBlockBtn.classList.remove('hidden');
 
