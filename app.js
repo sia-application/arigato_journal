@@ -453,7 +453,6 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
         userDisplay = `
             <div class="message-users">
                 <span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>
-                ${threadBtn}
                 ${deleteBtn}
             </div>
         `;
@@ -468,9 +467,10 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
         <div class="${cardClass}" id="msg-${msg.id}">
             <div class="message-header">
                 ${userDisplay}
+                ${type !== 'thread' ? `
                 <div class="message-meta" style="font-size: 0.8em; color: var(--text-secondary);">
                     ${timeLabel}${formatDate(timeToUse)}
-                </div>
+                </div>` : ''}
             </div>
 
             <div class="message-body">
