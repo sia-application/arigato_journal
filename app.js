@@ -412,8 +412,9 @@ function updateAllBadges(messagesInput) {
     let sentUnread = 0;
 
     messages.forEach(m => {
-        // Only count unread messages sent TO the current user from non-blocked users
-        if (m.toId === currentUser.userId && !m.isRead && !blocked.includes(m.fromId)) {
+        // Only count unread messages (or those unread this session) sent TO the current user from non-blocked users
+        const isSessionUnread = !m.isRead || sessionUnreadMessages.has(m.id);
+        if (m.toId === currentUser.userId && isSessionUnread && !blocked.includes(m.fromId)) {
             if (!m.rootId) {
                 // New Root Message (Someone sent me a Thank You) -> Received History
                 receivedUnread++;
