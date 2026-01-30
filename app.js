@@ -510,7 +510,7 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
         cardClass += ' unread';
     }
 
-    // Thread Button & Unread logical check
+    // Thread Button & Unread logical check (Exclude root messages from color trigger)
     const hasUnreadReplies = cachedMessages.some(m => m.rootId === msg.id && m.toId === currentUser.userId && !m.isRead);
     const isUnreadThread = sessionUnreadThreadButtons.has(msg.id) || hasUnreadReplies;
 
@@ -1095,8 +1095,8 @@ window.showReceivedDetail = (senderId, options = {}) => {
         const currentUserMessages = cachedMessages.filter(m => m.toId === currentUser.userId && m.fromId === senderId && !m.isRead);
         currentUserMessages.forEach(m => {
             sessionUnreadMessages.add(m.id);
+            // Only color the thread button for unread REPLIES
             if (m.rootId) sessionUnreadThreadButtons.add(m.rootId);
-            else sessionUnreadThreadButtons.add(m.id);
         });
     }
 
