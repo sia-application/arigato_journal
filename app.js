@@ -533,6 +533,8 @@ async function saveFcmToken() {
         }
     } catch (tokenErr) {
         console.log('Error retrieving/saving token: ', tokenErr);
+        // Debugging: Show exact error on mobile
+        alert(`通知エラー: ${tokenErr.message}`);
         showToast("通知設定の保存に失敗しました ❌");
     }
 }
