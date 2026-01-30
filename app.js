@@ -320,20 +320,30 @@ function setupListeners() {
         });
 
         // Re-render current views
-        // Note: This is a brute force re-render. Optimization would check what screen is active.
         const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
 
-        if (activeTab === 'timeline') renderTimeline();
-        else if (activeTab === 'received') renderReceivedMessages(); // This handles list vs detail check internally usually? No, we need to check.
-        // Actually render functions usually rebuild list.
+        // If a detail view is open, update ONLY that detail view to avoid flicker
+        // Otherwise, update the list view
+        if (activeTab === 'timeline') {
+            renderTimeline();
+        } else if (activeTab === 'received') {
+            if (currentReceivedPartnerId) {
+                showReceivedDetail(currentReceivedPartnerId);
+            } else {
+                renderReceivedMessages();
+            }
+        } else if (activeTab === 'sent') {
+            if (currentSentPartnerId) {
+                showSentDetail(currentSentPartnerId);
+            } else {
+                renderSentMessages();
+            }
+        }
 
-        // We always update badges
-        updateAllBadges();
-
-        // If detail views are open, update them
-        if (currentReceivedPartnerId) showReceivedDetail(currentReceivedPartnerId);
-        if (currentSentPartnerId) showSentDetail(currentSentPartnerId);
         if (currentThreadContext) renderThreadMessages();
+
+        // Always update badges
+        updateAllBadges();
     });
 
     // Listen for Users (e.g. if someone changes name, or I get followed)
@@ -1033,7 +1043,11 @@ window.showReceivedDetail = (senderId) => {
         threadIds.has(m.id) && !m.rootId
     ).sort((a, b) => b.createdAt - a.createdAt);
 
-    if (messages.length === 0) return;
+    if (messages.length === 0) {
+        // Automatically back to list if no messages left
+        backToReceivedList();
+        return;
+    }
 
     elements.receivedSendersList.classList.add('hidden');
     elements.receivedMessagesDetail.classList.remove('hidden');
@@ -1137,7 +1151,11 @@ window.showSentDetail = (recipientId) => {
         threadIds.has(m.id) && !m.rootId
     ).sort((a, b) => b.createdAt - a.createdAt);
 
-    if (messages.length === 0) return;
+    if (messages.length === 0) {
+        // Automatically back to list if no messages left
+        backToSentList();
+        return;
+    }
 
     elements.sentRecipientsList.classList.add('hidden');
     elements.sentMessagesDetail.classList.remove('hidden');
@@ -1162,6 +1180,7 @@ window.backToSentList = () => {
     currentSentPartnerId = null;
     elements.sentMessagesDetail.classList.add('hidden');
     elements.sentRecipientsList.classList.remove('hidden');
+    renderSentMessages();
 };
 
 function renderFollowingList() {
