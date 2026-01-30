@@ -427,22 +427,24 @@ function createMessageCard(msg, type = 'timeline', latestTime = null, hasUnread 
 
     // User Display
     let userDisplay = '';
+    const nameStyle = 'cursor:pointer; text-decoration:underline;';
+
     if (type === 'timeline') {
         userDisplay = `
             <div class="message-users">
-                <span class="message-from">${escapeHtml(msg.fromName)}</span>
+                <span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>
                 <span class="message-arrow">→</span>
-                <span class="message-to">${escapeHtml(msg.toName)}</span>
+                <span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span>
             </div>
         `;
     } else if (type === 'received') {
-        userDisplay = `<div class="message-users"><span class="message-from">${escapeHtml(msg.fromName)}</span></div>`;
+        userDisplay = `<div class="message-users"><span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span></div>`;
     } else if (type === 'sent') {
-        userDisplay = `<div class="message-users"><span class="message-to">${escapeHtml(msg.toName)}</span></div>`;
+        userDisplay = `<div class="message-users"><span class="message-to" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.toId}')">${escapeHtml(msg.toName)}</span></div>`;
     } else if (type === 'thread') {
         userDisplay = `
             <div class="message-users">
-                <span class="message-from">${escapeHtml(msg.fromName)}</span>
+                <span class="message-from" style="${nameStyle}" onclick="event.stopPropagation(); window.showUserProfile('${msg.fromId}')">${escapeHtml(msg.fromName)}</span>
             </div>
         `;
     }
@@ -763,7 +765,9 @@ function renderReceivedMessages() {
 
         div.innerHTML = `
             <div class="message-header">
-                <span class="message-from" style="font-weight:bold; font-size:1.1em;">${escapeHtml(sender.name)}</span>
+                <span class="message-from" style="font-weight:bold; font-size:1.1em; cursor:pointer;" onclick="event.stopPropagation(); window.showUserProfile('${sender.id}')">
+                    ${escapeHtml(sender.name)}
+                </span>
                 ${sender.unread > 0 ? '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.8em;">New</span>' : ''}
             </div>
              <div class="message-body" style="margin-top:8px;">
@@ -852,7 +856,9 @@ function renderSentMessages() {
         div.onclick = () => showSentDetail(pf.id);
         div.innerHTML = `
              <div class="message-header">
-                <span class="message-to" style="font-weight:bold; font-size:1.1em;">To: ${escapeHtml(pf.name)}</span>
+                <span class="message-to" style="font-weight:bold; font-size:1.1em; cursor:pointer;" onclick="event.stopPropagation(); window.showUserProfile('${pf.id}')">
+                    To: ${escapeHtml(pf.name)}
+                </span>
             </div>
              <div class="message-body" style="margin-top:8px;">
                 <div class="message-text" style="color:var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
