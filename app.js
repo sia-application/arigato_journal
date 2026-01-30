@@ -370,16 +370,11 @@ function setupListeners() {
 
         // Notification Logic
         if (!isInitialMessagesLoad && currentUser) {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === "added") {
-                    const msg = change.doc.data();
-                    // Only notify for messages sent TO me and not from me
-                    if (msg.toId === currentUser.userId && msg.fromId !== currentUser.userId) {
-                        const fromName = cachedUsers.find(u => u.userId === msg.fromId)?.name || "だれか";
-                        triggerNotification("ありがとうが届きました！", `${fromName}さんからメッセージが届いています。`);
-                    }
-                }
-            });
+            if (change.type === "added") {
+                const msg = change.doc.data();
+                // Foreground notification removed as per user request (background push only)
+                // if (msg.toId === currentUser.userId && msg.fromId !== currentUser.userId) { ... }
+            }
         }
         isInitialMessagesLoad = false;
 
