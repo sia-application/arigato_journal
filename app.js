@@ -582,24 +582,44 @@ window.toggleFollow = async (targetUserId) => {
     const currentUser = await refreshCurrentUser();
     if (!currentUser) return;
 
-    // Logic similar to original but using firestore updates
-    // Update MY document (following array)
-    // Update THEIR document (optional if we don't store followers array, but we do store nothing on their side usually?
-    // Original logic: update currentUser.following
-
     const userRef = doc(db, "users", currentUser.userId);
+    const following = currentUser.following || [];
 
-    if (currentUser.following && currentUser.following.includes(targetUserId)) {
+    if (following.includes(targetUserId)) {
         await updateDoc(userRef, {
             following: arrayRemove(targetUserId)
         });
+        showToast('フォローを解除しました');
     } else {
         await updateDoc(userRef, {
             following: arrayUnion(targetUserId)
         });
+        showToast('フォローしました');
     }
-    // UI updates via listener
 };
+
+window.toggleBlock = async (targetUserId) => {
+    const currentUser = await refreshCurrentUser();
+    if (!currentUser) return;
+
+    if (!confirm('このユーザーをブロック/解除しますか？')) return;
+
+    const userRef = doc(db, "users", currentUser.userId);
+    const blocked = currentUser.blocked || [];
+
+    if (blocked.includes(targetUserId)) {
+        await updateDoc(userRef, {
+            blocked: arrayRemove(targetUserId)
+        });
+        showToast('ブロックを解除しました');
+    } else {
+        await updateDoc(userRef, {
+            blocked: arrayUnion(targetUserId)
+        });
+        showToast('ブロックしました');
+    }
+};
+
 
 window.deleteMessage = async (msgId) => {
     await deleteMessage(msgId);
@@ -651,16 +671,373 @@ function renderThreadMessages() {
     setTimeout(() => listContainer.scrollTop = listContainer.scrollHeight, 10);
 }
 
-// Stubbing other renders to use cachedMessages
-function renderReceivedMessages() { /* ... similar to original ... */
+// ============================
+// Render Functions (Implemented)
+// ============================
+
+function renderUserCard(user, type = 'following') {
     const currentUser = getCurrentUser();
-    // Simplified reimplementation
-    const messages = cachedMessages.filter(m => m.toId === currentUser.userId && !m.rootId);
-    // ... grouping logic ...
-    // For brevity, I will assume the user accepts the code structure. 
-    // I should provide a FULL Implementation to avoid breaking the app.
-    // ... 
-    // To save tokens, I will implement the critical path: Timeline works.
+    const isMe = user.userId === currentUser.userId;
+    const isFollowing = currentUser.following && currentUser.following.includes(user.userId);
+
+    // Check if they follow you
+    const followsYou = user.following && user.following.includes(currentUser.userId);
+
+    let actionBtn = '';
+    if (!isMe) {
+        if (type === 'search') {
+            actionBtn = `<button class="btn btn-sm ${isFollowing ? 'btn-outline' : 'btn-primary'}" onclick="window.toggleFollow('${user.userId}')">
+                ${isFollowing ? '解除' : 'フォロー'}
+            </button>`;
+        } else if (type === 'blocked') {
+            actionBtn = `<button class="btn btn-sm btn-outline" onclick="window.toggleBlock('${user.userId}')">解除</button>`;
+        } else { // following / follower
+            actionBtn = `<button class="btn btn-sm btn-outline" onclick="window.toggleFollow('${user.userId}')">解除</button>`;
+        }
+    }
+
+    return `
+        <div class="message-card user-card">
+            <div class="user-card-content" onclick="window.showUserProfile('${user.userId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; flex:1;">
+                <div class="profile-avatar sm">${user.avatar || '👤'}</div>
+                <div class="user-info">
+                    <div class="user-name">
+                        ${escapeHtml(user.name)}
+                        ${followsYou ? '<span class="follows-you-badge">フォローされています</span>' : ''}
+                    </div>
+                    <div class="user-id">@${user.userId}</div>
+                </div>
+            </div>
+            ${actionBtn}
+        </div>
+    `;
+}
+
+function renderReceivedMessages() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+    const blocked = currentUser.blocked || [];
+
+    const messages = cachedMessages.filter(m =>
+        m.toId === currentUser.userId &&
+        !m.rootId &&
+        !blocked.includes(m.fromId)
+    );
+
+    const senders = {};
+    messages.forEach(msg => {
+        if (!senders[msg.fromId]) {
+            senders[msg.fromId] = {
+                id: msg.fromId,
+                name: msg.fromName,
+                lastMessage: msg,
+                count: 0,
+                unread: 0
+            };
+        }
+        if (msg.createdAt > senders[msg.fromId].lastMessage.createdAt) {
+            senders[msg.fromId].lastMessage = msg;
+        }
+        senders[msg.fromId].count++;
+        if (!msg.isRead) senders[msg.fromId].unread++;
+    });
+
+    const listContainer = elements.receivedSendersList;
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+    elements.receivedMessagesDetail.classList.add('hidden');
+    listContainer.classList.remove('hidden');
+
+    const sortedSenders = Object.values(senders).sort((a, b) => b.lastMessage.createdAt - a.lastMessage.createdAt);
+
+    if (sortedSenders.length === 0) {
+        listContainer.innerHTML = '<div class="empty-state"><span class="empty-icon">📭</span><p>まだありがとうのメッセージはありません</p></div>';
+        return;
+    }
+
+    sortedSenders.forEach(sender => {
+        const div = document.createElement('div');
+        div.className = `message-card ${sender.unread > 0 ? 'unread' : ''}`;
+        div.style.cursor = 'pointer';
+        div.onclick = () => showReceivedDetail(sender.id);
+
+        div.innerHTML = `
+            <div class="message-header">
+                <span class="message-from" style="font-weight:bold; font-size:1.1em;">${escapeHtml(sender.name)}</span>
+                ${sender.unread > 0 ? '<span class="badge" style="background:var(--pink-500); color:white; padding:2px 8px; border-radius:12px; font-size:0.8em;">New</span>' : ''}
+            </div>
+             <div class="message-body" style="margin-top:8px;">
+                <div class="message-text" style="color:var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${escapeHtml(sender.lastMessage.message)}
+                </div>
+            </div>
+            <div class="message-footer" style="text-align:right; font-size:0.8em; color:var(--text-light); margin-top:4px;">
+                ${formatDate(sender.lastMessage.createdAt)}
+            </div>
+        `;
+        listContainer.appendChild(div);
+    });
+}
+
+window.showReceivedDetail = (senderId) => {
+    currentReceivedPartnerId = senderId;
+    const currentUser = getCurrentUser();
+
+    // Mark as read
+    markMessagesAsRead(currentUser.userId, senderId, false);
+
+    const messages = cachedMessages.filter(m =>
+        m.toId === currentUser.userId &&
+        m.fromId === senderId &&
+        !m.rootId
+    ).sort((a, b) => b.createdAt - a.createdAt);
+
+    if (messages.length === 0) return;
+
+    elements.receivedSendersList.classList.add('hidden');
+    elements.receivedMessagesDetail.classList.remove('hidden');
+    elements.detailSenderName.textContent = messages[0].fromName; // Use latest name
+
+    elements.detailMessagesList.innerHTML = messages.map(msg => createMessageCard(msg, 'received')).join('');
+}
+
+window.backToReceivedList = () => {
+    currentReceivedPartnerId = null;
+    elements.receivedMessagesDetail.classList.add('hidden');
+    elements.receivedSendersList.classList.remove('hidden');
+    renderReceivedMessages(); // Re-render to update unread status
+};
+
+function renderSentMessages() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+    // Sent messages logic...
+    const messages = cachedMessages.filter(m =>
+        m.fromId === currentUser.userId &&
+        !m.rootId
+    );
+
+    const recipients = {};
+    messages.forEach(msg => {
+        if (!recipients[msg.toId]) {
+            recipients[msg.toId] = {
+                id: msg.toId,
+                name: msg.toName, // Snapshot name
+                lastMessage: msg,
+                count: 0
+            };
+        }
+        if (msg.createdAt > recipients[msg.toId].lastMessage.createdAt) {
+            recipients[msg.toId].lastMessage = msg;
+        }
+        recipients[msg.toId].count++;
+    });
+
+    const listContainer = elements.sentRecipientsList;
+    listContainer.innerHTML = '';
+    elements.sentMessagesDetail.classList.add('hidden');
+    listContainer.classList.remove('hidden');
+
+    const sortedRecipients = Object.values(recipients).sort((a, b) => b.lastMessage.createdAt - a.lastMessage.createdAt);
+
+    if (sortedRecipients.length === 0) {
+        listContainer.innerHTML = '<div class="empty-state"><span class="empty-icon">✨</span><p>まだありがとうを送っていません</p></div>';
+        return;
+    }
+
+    sortedRecipients.forEach(pf => {
+        const div = document.createElement('div');
+        div.className = 'message-card';
+        div.style.cursor = 'pointer';
+        div.onclick = () => showSentDetail(pf.id);
+        div.innerHTML = `
+             <div class="message-header">
+                <span class="message-to" style="font-weight:bold; font-size:1.1em;">To: ${escapeHtml(pf.name)}</span>
+            </div>
+             <div class="message-body" style="margin-top:8px;">
+                <div class="message-text" style="color:var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${escapeHtml(pf.lastMessage.message)}
+                </div>
+            </div>
+             <div class="message-footer" style="text-align:right; font-size:0.8em; color:var(--text-light); margin-top:4px;">
+                ${formatDate(pf.lastMessage.createdAt)}
+            </div>
+        `;
+        listContainer.appendChild(div);
+    });
+}
+
+window.showSentDetail = (recipientId) => {
+    currentSentPartnerId = recipientId;
+    const currentUser = getCurrentUser();
+
+    const messages = cachedMessages.filter(m =>
+        m.fromId === currentUser.userId &&
+        m.toId === recipientId &&
+        !m.rootId
+    ).sort((a, b) => b.createdAt - a.createdAt);
+
+    if (messages.length === 0) return;
+
+    elements.sentRecipientsList.classList.add('hidden');
+    elements.sentMessagesDetail.classList.remove('hidden');
+    elements.detailRecipientName.textContent = messages[0].toName;
+
+    elements.detailSentMessagesList.innerHTML = messages.map(msg => createMessageCard(msg, 'sent')).join('');
+};
+
+window.backToSentList = () => {
+    currentSentPartnerId = null;
+    elements.sentMessagesDetail.classList.add('hidden');
+    elements.sentRecipientsList.classList.remove('hidden');
+};
+
+function renderFollowingList() {
+    const currentUser = getCurrentUser();
+    if (!currentUser || !elements.followingList) return;
+    const followingIds = currentUser.following || [];
+    const container = elements.followingList;
+    container.innerHTML = '';
+    const followingUsers = cachedUsers.filter(u => followingIds.includes(u.userId));
+
+    if (followingUsers.length === 0) {
+        container.innerHTML = '<div class="empty-state"><span class="empty-icon">👥</span><p>まだフォローしている人はいません</p></div>';
+    } else {
+        followingUsers.forEach(user => {
+            container.innerHTML += renderUserCard(user, 'following');
+        });
+    }
+    updateRecipientSelect(followingUsers);
+}
+
+function renderFollowerList() {
+    const currentUser = getCurrentUser();
+    if (!currentUser || !elements.followerList) return;
+    const container = elements.followerList;
+    container.innerHTML = '';
+    // Filter users who follow me
+    const followers = cachedUsers.filter(u => u.following && u.following.includes(currentUser.userId));
+
+    if (followers.length === 0) {
+        container.innerHTML = '<div class="empty-state"><span class="empty-icon">👥</span><p>まだフォロワーはいません</p></div>';
+    } else {
+        followers.forEach(user => {
+            container.innerHTML += renderUserCard(user, 'followers');
+        });
+    }
+}
+
+function renderBlockedList() {
+    const currentUser = getCurrentUser();
+    if (!currentUser || !elements.blockedList) return;
+    const blockedIds = currentUser.blocked || [];
+    const container = elements.blockedList;
+    container.innerHTML = '';
+    const blockedUsers = cachedUsers.filter(u => blockedIds.includes(u.userId));
+
+    if (blockedUsers.length === 0) {
+        container.innerHTML = '<div class="empty-state"><span class="empty-icon">🚫</span><p>ブロックしている人はいません</p></div>';
+    } else {
+        blockedUsers.forEach(user => {
+            container.innerHTML += renderUserCard(user, 'blocked');
+        });
+    }
+}
+
+function renderSearchResult() {
+    const queryStr = elements.searchUserIdInput.value.trim().toLowerCase();
+    const container = elements.searchResult;
+    if (!queryStr) {
+        container.innerHTML = '';
+        return;
+    }
+    const results = cachedUsers.filter(u =>
+        u.userId.toLowerCase().includes(queryStr) ||
+        u.name.toLowerCase().includes(queryStr)
+    );
+    if (results.length === 0) {
+        container.innerHTML = '<p style="text-align:center; padding:16px; color:var(--text-light);">見つかりませんでした</p>';
+    } else {
+        container.innerHTML = results.map(u => renderUserCard(u, 'search')).join('');
+    }
+}
+
+function updateRecipientSelect(friends) {
+    if (!elements.recipientSelect) return;
+    elements.recipientSelect.innerHTML = '<option value="">▼ 送りたい相手を選んでください</option>';
+    friends.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.userId;
+        option.textContent = `${user.name} (@${user.userId})`;
+        option.dataset.name = user.name;
+        elements.recipientSelect.appendChild(option);
+    });
+}
+
+function renderProfileModal(user) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    elements.modalUsername.textContent = user.name;
+    elements.modalUserid.textContent = `@${user.userId}`;
+    elements.profileAvatarDisplay.textContent = user.avatar || '👤';
+    elements.bioDisplay.textContent = user.bio || '自己紹介はまだありません';
+
+    // Stats
+    const followingCount = user.following ? user.following.length : 0;
+    // Calculating followers strictly needs iterating all users (expensive) or storing it.
+    // We'll iterate cachedUsers for now.
+    const followerCount = cachedUsers.filter(u => u.following && u.following.includes(user.userId)).length;
+
+    elements.followingCount.textContent = followingCount;
+    elements.followerCount.textContent = followerCount;
+
+    // Reset Edit Mode
+    elements.bioDisplay.classList.remove('hidden');
+    elements.bioEdit.classList.add('hidden');
+    elements.usernameEdit.classList.add('hidden');
+    elements.modalUsername.classList.remove('hidden');
+    elements.avatarEditOverlay.classList.add('hidden');
+
+    elements.modalEditBtn.classList.add('hidden');
+    elements.modalSaveBtn.classList.add('hidden');
+    elements.modalCancelBtn.classList.add('hidden');
+    elements.modalActionBtn.classList.add('hidden');
+    elements.modalBlockBtn.classList.add('hidden');
+    elements.modalThanksBtn.classList.add('hidden');
+
+    if (user.userId === currentUser.userId) {
+        // Own Profile
+        elements.modalEditBtn.classList.remove('hidden');
+        elements.modalFollowsYouBadge.classList.add('hidden');
+    } else {
+        // Other User
+        const isFollowing = currentUser.following && currentUser.following.includes(user.userId);
+        elements.modalActionBtn.textContent = isFollowing ? 'フォロー解除' : 'フォローする';
+        elements.modalActionBtn.className = isFollowing ? 'btn btn-outline' : 'btn btn-primary';
+        elements.modalActionBtn.onclick = () => window.toggleFollow(user.userId);
+        elements.modalActionBtn.classList.remove('hidden');
+
+        elements.modalThanksBtn.classList.remove('hidden');
+        elements.modalThanksBtn.onclick = () => {
+            elements.profileModal.classList.remove('show');
+            setTimeout(() => elements.profileModal.classList.add('hidden'), 300);
+            switchTab('send');
+            elements.recipientSelect.value = user.userId;
+        };
+
+        const isBlocked = currentUser.blocked && currentUser.blocked.includes(user.userId);
+        elements.modalBlockBtn.textContent = isBlocked ? 'ブロック解除' : 'ブロック';
+        elements.modalBlockBtn.onclick = () => window.toggleBlock(user.userId);
+        elements.modalBlockBtn.classList.remove('hidden');
+
+        const followsYou = user.following && user.following.includes(currentUser.userId);
+        followsYou ? elements.modalFollowsYouBadge.classList.remove('hidden') : elements.modalFollowsYouBadge.classList.add('hidden');
+    }
+
+    elements.profileModal.classList.remove('hidden');
+    void elements.profileModal.offsetWidth;
+    elements.profileModal.classList.add('show');
 }
 // Actually, I must implement them all or the app breaks.
 // I will paste the previous render logic but pointing to cachedMessages.
@@ -709,6 +1086,41 @@ function initialize() {
 
         // Initial Tab
         switchTab('timeline');
+
+        // Friend List Toggles
+        if (elements.listTypeSelect) {
+            elements.listTypeSelect.addEventListener('change', (e) => {
+                const type = e.target.value;
+                elements.followingListWrapper.classList.toggle('hidden', type !== 'following');
+                elements.followerListWrapper.classList.toggle('hidden', type !== 'followers');
+                elements.blockedListWrapper.classList.toggle('hidden', type !== 'blocked');
+            });
+        }
+
+        if (elements.searchSectionToggle) {
+            elements.searchSectionToggle.addEventListener('click', () => {
+                const content = elements.searchSectionContent;
+                const icon = elements.searchSectionToggle.querySelector('.toggle-icon');
+                const isHidden = content.style.display === 'none';
+                content.style.display = isHidden ? 'block' : 'none';
+                icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+                elements.searchSectionToggle.classList.toggle('collapsed', !isHidden);
+            });
+        }
+
+        if (elements.searchUserIdInput) {
+            elements.searchUserIdInput.addEventListener('input', renderSearchResult);
+        }
+
+        // Profile Actions
+        if (elements.modalEditBtn) {
+            elements.modalEditBtn.addEventListener('click', toggleProfileEdit);
+            elements.modalCancelBtn.addEventListener('click', toggleProfileEdit);
+            elements.modalSaveBtn.addEventListener('click', handleSaveProfile);
+            elements.avatarEditOverlay.addEventListener('click', () => elements.avatarUpload.click());
+            elements.avatarUpload.addEventListener('change', handleAvatarUpload);
+        }
+
     }
 }
 
@@ -718,12 +1130,70 @@ function switchTab(tabName) {
     elements.tabContents.forEach(content => content.classList.toggle('active', content.id === `tab-${tabName}`));
 
     if (tabName === 'timeline') renderTimeline();
-    // others...
+    else if (tabName === 'received') renderReceivedMessages();
+    else if (tabName === 'sent') renderSentMessages();
+    else if (tabName === 'friends') {
+        renderFollowingList();
+        renderFollowerList();
+        renderBlockedList();
+    }
 }
 function handleTabClick(e) {
     const tabBtn = e.target.closest('.tab-btn');
     if (tabBtn) switchTab(tabBtn.dataset.tab);
 }
+
+// Profile View Helpers
+function toggleProfileEdit() {
+    const isEditing = !elements.bioDisplay.classList.contains('hidden');
+    elements.bioDisplay.classList.toggle('hidden', isEditing);
+    elements.bioEdit.classList.toggle('hidden', !isEditing);
+    elements.usernameEdit.classList.toggle('hidden', !isEditing);
+    elements.modalUsername.classList.toggle('hidden', isEditing);
+    elements.avatarEditOverlay.classList.toggle('hidden', !isEditing);
+
+    elements.modalEditBtn.classList.toggle('hidden', isEditing);
+    elements.modalSaveBtn.classList.toggle('hidden', !isEditing);
+    elements.modalCancelBtn.classList.toggle('hidden', !isEditing);
+
+    if (isEditing) {
+        elements.bioEdit.value = elements.bioDisplay.textContent === '自己紹介はまだありません' ? '' : elements.bioDisplay.textContent;
+        elements.usernameEdit.value = elements.modalUsername.textContent;
+    }
+}
+
+async function handleSaveProfile() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    const newName = elements.usernameEdit.value.trim();
+    const newBio = elements.bioEdit.value.trim();
+
+    if (!newName) {
+        showToast('名前を入力してください');
+        return;
+    }
+
+    try {
+        const userRef = doc(db, "users", currentUser.userId);
+        await updateDoc(userRef, {
+            name: newName,
+            bio: newBio
+        });
+        showToast('プロフィールを更新しました');
+        toggleProfileEdit();
+    } catch (err) {
+        console.error(err);
+        showToast('更新に失敗しました');
+    }
+}
+
+async function handleAvatarUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    showToast('画像のアップロード機能は現在Emoijのみ対応しています（将来的にStorageに対応予定）');
+}
+
 
 // Start
 document.addEventListener('DOMContentLoaded', initialize);
